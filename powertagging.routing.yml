@@ -1,0 +1,59 @@
+entity.powertagging.fixed_connection_add_form:
+  path: '/admin/config/semantic-drupal/powertagging/add/{connection}/{project_id}'
+  defaults:
+    _form: '\Drupal\powertagging\Form\PowerTaggingConfigFixedConnectionAddForm'
+    _title: 'Add a PowerTagging configuration for a preselected PP server and project.'
+  requirements:
+    _permission: 'administer powertagging'
+  options:
+    parameters:
+      connection:
+        type: entity:pp_server_connection
+
+entity.powertagging.tag_content:
+  path: '/admin/config/semantic-drupal/powertagging/{powertagging_config}/tag-content'
+  defaults:
+    _form: '\Drupal\powertagging\Form\PowerTaggingTagContentForm'
+    _title: 'Bulk tagging of PowerTagging configuration'
+  requirements:
+    _permission: 'administer powertagging'
+  options:
+    parameters:
+      powertagging_config:
+        type: entity:powertagging
+
+entity.powertagging.update_vocabulary:
+  path: '/admin/config/semantic-drupal/powertagging/{powertagging_config}/update-vocabulary'
+  defaults:
+    _form: '\Drupal\powertagging\Form\PowerTaggingUpdateVocabularyForm'
+    _title: 'Updating taxonomy terms of PowerTagging configuration'
+  requirements:
+    _permission: 'administer powertagging'
+  options:
+    parameters:
+      powertagging_config:
+        type: entity:powertagging
+
+powertagging.autocomplete_tags:
+  path: '/powertagging/autocomplete-tags/{powertagging_config}/{langcode}'
+  defaults:
+    _controller: '\Drupal\powertagging\Controller\PowerTaggingController::autocompleteTags'
+    _title: 'Get the concepts for a PowerTagging configuration matching a string.'
+  requirements:
+    _permission: 'access content'
+  options:
+    parameters:
+      powertagging_config:
+        type: entity:powertagging
+
+powertagging.extract:
+  path: '/powertagging/extract/{powertagging_config}'
+  defaults:
+    _controller: '\Drupal\powertagging\Controller\PowerTaggingController::extract'
+    _title: 'Extract concepts and free terms from content.'
+  requirements:
+    _permission: 'access content'
+  options:
+    parameters:
+      powertagging_config:
+        type: entity:powertagging

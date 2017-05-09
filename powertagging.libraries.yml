@@ -1,0 +1,31 @@
+admin_area:
+  version: 1.0
+  js:
+    js/powertagging.admin.js: {}
+  dependencies:
+    - core/jquery
+
+slider:
+  version: 1.0
+  js:
+    js/slider.js: {}
+  css:
+    theme:
+      css/slider.css: {}
+  dependencies:
+    - core/drupalSettings
+    - core/jquery
+    - core/jquery.ui.slider
+
+widget:
+  version: 1.0
+  js:
+    js/powertagging.widget.js: {}
+  css:
+    theme:
+      css/powertagging.widget.css: {}
+  dependencies:
+    - core/drupalSettings
+    - core/jquery
+    - core/jquery.once
+    - core/autocomplete

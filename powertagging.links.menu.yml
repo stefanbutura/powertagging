@@ -1,0 +1,7 @@
+# PowerTagging menu items definition
+entity.powertagging.overview:
+  title: 'PowerTagging'
+  route_name: entity.powertagging.collection
+  description: 'Manage PowerTagging configurations'
+  parent: semantic_connector.semantic_drupal
+

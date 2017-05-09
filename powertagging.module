@@ -1,0 +1,58 @@
+<?php
+
+/**
+ * @file
+ * Contains powertagging.module.
+ */
+
+use Drupal\Core\Routing\RouteMatchInterface;
+
+/**
+ * Implements hook_help().
+ */
+function powertagging_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    // Main module help for the powertagging module.
+    case 'help.page.powertagging':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('PowerTagging is semantic power for Drupal. This module extends Drupal’s ability to support linking and finding of ideas, contents and experts.') . '</p>';
+      return $output;
+
+    default:
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function powertagging_theme() {
+  return [
+    'powertagging' => [
+      'render element' => 'children',
+      'template' => 'powertagging',
+    ],
+    'slider' => [
+      'render element' => 'element',
+      'template' => 'slider',
+    ],
+  ];
+}
+
+/**
+ * Implements hook_form_alter().
+ *
+ * Alter the field configuration of the powertagging_tags field.
+ */
+function powertagging_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
+  $field_storage = $form_state->getStorage();
+  if (isset($field_storage['field_config'])) {
+    /* @var \Drupal\field\Entity\FieldConfig $field_config */
+    $field_config = $field_storage['field_config'];
+    if ($form_id == 'field_storage_config_edit_form' && $field_config->getType() == 'powertagging_tags') {
+      // Fix the cardinality to "Unlimited".
+      $form['cardinality_container']['cardinality']['#default_value'] = -1;
+      $form['cardinality_container']['cardinality']['#attributes']['disabled'] = 'disabled';
+    }
+  }
+}
