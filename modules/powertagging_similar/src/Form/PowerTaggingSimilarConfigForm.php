@@ -13,6 +13,7 @@ use Drupal\Core\Url;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
 use Drupal\powertagging\PowerTagging;
 use Drupal\powertagging_similar\Entity\PowerTaggingSimilarConfig;
+use Drupal\semantic_connector\SemanticConnector;
 
 class PowerTaggingSimilarConfigForm extends EntityForm {
   /**
@@ -53,7 +54,7 @@ class PowerTaggingSimilarConfigForm extends EntityForm {
       '#title' => t('PowerTagging Configuration'),
       '#options' => $powertagging_ids,
       '#required' => TRUE,
-      '#default_value' => ($entity->getPowerTaggingId() > 0 ? $entity->getPowerTaggingId() : key($powertagging_ids)),
+      '#default_value' => (!empty($entity->getPowerTaggingId()) ? $entity->getPowerTaggingId() : key($powertagging_ids)),
     );
 
     $form['content_types']['#tree'] = TRUE;
@@ -102,19 +103,29 @@ class PowerTaggingSimilarConfigForm extends EntityForm {
           }
         }
 
+        $form['content_types'][$powertagging_id]['content'] = array(
+          '#type' => 'table',
+          '#header' => array(t('Content'), t('Show'), t('Title'), t('Number of items to display'), t('Weight')),
+          '#empty' => t('No content type is connected to this PowerTagging configuration.'),
+          '#description' => t('Choose the content you want to display in the widget and in which order.'),
+          '#tabledrag' => array(
+            array(
+              'action' => 'order',
+              'relationship' => 'sibling',
+              'group' => 'content-types-' . $powertagging_id . '-order-weight',
+            ),
+          ),
+          '#tree' => TRUE,
+        );
+
         foreach ($weighted_content_types as $weight => $content_type) {
           $key = $content_type['entity_key'];
+
+          // TableDrag: Mark the table row as draggable.
+          $form['content_types'][$powertagging_id]['content'][$key]['#attributes']['class'][] = 'draggable';
+
           $form['content_types'][$powertagging_id]['content'][$key]['node'] = array(
             '#markup' => $content_type['entity_label'],
-          );
-
-          // This field is invisible, but contains sort info (weights).
-          $form['content_types'][$powertagging_id]['content'][$key]['weight'] = array(
-            '#type' => 'weight',
-            // Weights from -255 to +255 are supported because of this delta.
-            '#delta' => 255,
-            '#title_display' => 'invisible',
-            '#default_value' => $weight,
           );
 
           $form['content_types'][$powertagging_id]['content'][$key]['show'] = array(
@@ -141,6 +152,16 @@ class PowerTaggingSimilarConfigForm extends EntityForm {
                 ':input[name="merge_content"]' => array('checked' => TRUE),
               ),
             ),
+          );
+
+          // This field is invisible, but contains sort info (weights).
+          $form['content_types'][$powertagging_id]['content'][$key]['weight'] = array(
+            '#type' => 'weight',
+            // Weights from -255 to +255 are supported because of this delta.
+            '#delta' => 255,
+            '#title_display' => 'invisible',
+            '#default_value' => $weight,
+            '#attributes' => array('class' => array('content-types-' . $powertagging_id . '-order-weight')),
           );
         }
       }
@@ -197,7 +218,33 @@ class PowerTaggingSimilarConfigForm extends EntityForm {
   /**
    * {@inheritdoc}
    */
-  public function validateForm(array &$form, FormStateInterface $form_state) {}
+  public function validateForm(array &$form, FormStateInterface $form_state) {
+    // At least one content type needs to be shown for the widget.
+    // Is there even content available?
+    $powertagging_id = $form_state->getValue('powertagging_id');
+    $content_type_values = $form_state->getValue('content_types');
+    if (!isset($content_type_values[$powertagging_id]['content'])) {
+      $form_state->setErrorByName('', t('At least one content type needs to be selected to be displayed in the widget.'));
+    }
+    else {
+      $content_types = $content_type_values[$powertagging_id]['content'];
+      $content_selected = FALSE;
+      foreach ($content_types as $entity_key => $content_type) {
+        if ($content_type['show']) {
+          $content_selected = TRUE;
+
+          // Selected content types need a title.
+          if (!$form_state->getValue('merge_content') && trim($content_type['title']) == '') {
+            $form_state->setErrorByName('content_types][' . $powertagging_id . '][content][' . $entity_key . '][title', t('Selected content types need a title.'));
+          }
+        }
+      }
+      // Is any content selected?
+      if (!$content_selected) {
+        $form_state->setErrorByName('', t('At least one content type needs to be selected to be displayed in the widget.'));
+      }
+    }
+  }
 
   /**
    * {@inheritdoc}
@@ -205,12 +252,45 @@ class PowerTaggingSimilarConfigForm extends EntityForm {
   public function save(array $form, FormStateInterface $form_state) {
     /** @var PowerTaggingSimilarConfig $entity */
     $entity = $this->entity;
+    $is_new = !$entity->getOriginalId();
+    if ($is_new) {
+      // Configuration entities need an ID manually set.
+      $entity->set('id', SemanticConnector::createUniqueEntityMachineName('powertagging_similar', $entity->get('title')));
+      drupal_set_message(t('Powertagging Similar Content widget %title has been created.', array('%title' => $entity->get('title'))));
+    }
+    else {
+      drupal_set_message(t('Updated Powertagging Similar Content widget %title.',
+        array('%title' => $entity->get('title'))));
+    }
+
+    $content_type_values = $form_state->getValue('content_types');
+    foreach ($content_type_values as &$content_type) {
+      if (isset($content_type['content'])) {
+        $weighted_content = array();
+        foreach ($content_type['content'] as $entity_id => $content) {
+          $weight = $content['weight'];
+          unset($content['weight']);
+          $content['entity_key'] = $entity_id;
+          $weighted_content[$weight] = $content;
+        }
+        if (!empty($weighted_content)) {
+          ksort($weighted_content);
+          $weighted_content = array_values($weighted_content);
+        }
+        $content_type = $weighted_content;
+      }
+      unset($content_type);
+    }
 
     // Update and save the entity.
     $entity->set('title', $form_state->getValue('title'));
-    $entity->set('config', array('max_items' => $form_state->getValue('max_items')));
-
-    drupal_set_message(t('powertagging Similar Content widget %title has been saved.', array('%title' => $form_state->getValue('title'))));
+    $entity->set('powertagging_id', $form_state->getValue('powertagging_id'));
+    $entity->set('config', array(
+      'content_types' => $content_type_values,
+      'display_type' => $form_state->getValue('display_type'),
+      'merge_content' => $form_state->getValue('merge_content'),
+      'merge_content_count' => $form_state->getValue('merge_content_count'),
+    ));
     $entity->save();
 
     $form_state->setRedirectUrl(Url::fromRoute('entity.powertagging_similar.collection'));

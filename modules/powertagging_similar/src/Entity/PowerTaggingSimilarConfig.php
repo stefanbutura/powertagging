@@ -14,9 +14,9 @@ use Drupal\Core\Config\Entity\ConfigEntityBase;
  *   handlers = {
  *     "list_builder" = "Drupal\powertagging_similar\PowerTaggingSimilarConfigListBuilder",
  *     "form" = {
- *       "default" = "Drupal\powertagging_similar\Form\PowerTaggingSimilarConfigConnectionForm",
- *       "add" = "Drupal\powertagging_similar\Form\PowerTaggingSimilarConfigConnectionForm",
- *       "edit" = "Drupal\powertagging_similar\Form\PowerTaggingSimilarConfigConnectionForm",
+ *       "default" = "Drupal\powertagging_similar\Form\PowerTaggingSimilarConfigForm",
+ *       "add" = "Drupal\powertagging_similar\Form\PowerTaggingSimilarConfigForm",
+ *       "edit" = "Drupal\powertagging_similar\Form\PowerTaggingSimilarConfigForm",
  *       "delete" = "Drupal\powertagging_similar\Form\PowerTaggingSimilarConfigDeleteForm"
  *     }
  *   },

@@ -6,6 +6,9 @@
  */
 
 namespace Drupal\powertagging;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\file\Entity\File;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
 use Drupal\semantic_connector\Api\SemanticConnectorPPXApi;
@@ -262,6 +265,119 @@ class PowerTagging {
     return $tags;
   }
 
+  /**
+   * Get all powertagging field instances.
+   *
+   * @return FieldConfig[]
+   *   Array of field instances that match the filters.
+   */
+  function getTaggingFieldInstances() {
+    $fields = \Drupal::entityTypeManager()
+      ->getStorage('field_storage_config')
+      ->loadByProperties(array('type' => 'powertagging_tags'));
+
+    $field_options = array();
+    /** @var FieldStorageConfig $field_data */
+    foreach ($fields as $field_data) {
+      if ($field_data->getSetting('powertagging_id') != $this->config->id()) {
+        continue;
+      }
+
+      $field_instances = \Drupal::entityTypeManager()
+        ->getStorage('field_config')
+        ->loadByProperties(array('field_name' => $field_data->getName()));
+      /** @var FieldConfig $field_instance */
+      foreach ($field_instances as $field_instance) {
+        if ($this->checkFieldInstance($field_instance)) {
+          $field_options[] = $field_instance;
+        }
+      }
+    }
+
+    return $field_options;
+  }
+
+  /**
+   * Check if a powertagging-field-instance is correctly configured to allow tags.
+   *
+   * @param FieldConfig $instance
+   *   The field instance to check.
+   *
+   * @return bool
+   *   TRUE if the field instance was configured correctly, FALSE if not.
+   */
+  function checkFieldInstance($instance) {
+    if ($instance->getType() == 'powertagging_tags') {
+      // Check if the "Number of values" was set to "Unlimited".
+      $storage = $instance->getFieldStorageDefinition();
+      if ($storage->getCardinality() == FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED) {
+        // Check if fields are set.
+        $fields_to_check = array();
+        foreach ($instance->getSetting('fields') as $field_id) {
+          if ($field_id != FALSE) {
+            $fields_to_check[] = $field_id;
+          }
+        }
+        if (!empty($fields_to_check)) {
+          return TRUE;
+        }
+      }
+    }
+
+    return FALSE;
+  }
+
+  /**
+   * Returns a list with Power Tagging fields as a option list.
+   *
+   * @param FieldConfig[] $field_instances
+   *   An array of field instances with "PowerTagging Tags" fields.
+   *
+   * @param boolean $add_fieldname (optional)
+   *   Adds the machine name of the field if the value is TRUE.
+   *
+   * @return array
+   *   Option list with Power Tagging fields.
+   */
+  function getTaggingFieldOptionsList($field_instances, $add_fieldname = FALSE) {
+    $content_type_options = array();
+    if (!empty($field_instances)) {
+      $node_type_names = node_type_get_names();
+      $taxonomy_names = taxonomy_vocabulary_get_names();
+
+      /** @var FieldConfig $field_instance */
+      foreach ($field_instances as $field_instance) {
+        $option_title = '';
+        // Build the title of the option.
+        switch ($field_instance->getTargetEntityTypeId()) {
+          case 'node':
+            $option_title = t('Content type "@name"', array('@name' => $node_type_names[$field_instance->getTargetBundle()]));
+            break;
+
+          case 'user':
+            $option_title = t('User');
+            break;
+
+          case 'taxonomy_term':
+            $option_title = t('Vocabulary "@name"', array('@name' => $taxonomy_names[$field_instance->getTargetBundle()]->name));
+            break;
+
+          default:
+            // If the entity type is not supported, throw an error and continue.
+            drupal_set_message(t('Entity type "%entitytype" is not supported.', array('%entitytype' => $field_instance->getTargetEntityTypeId())), 'warning');
+            continue;
+        }
+        if ($add_fieldname) {
+          $option_title .= ' (' . $field_instance->getName() . ')';
+        }
+
+        // Add the option.
+        $content_type_options[$field_instance->getTargetEntityTypeId() . ' ' . $field_instance->getTargetBundle() . ' ' . $field_instance->getName()] = $option_title;
+      }
+    }
+
+    return $content_type_options;
+  }
 
   /**
    * Add the corresponding taxonomy term id to the concepts or free terms.
