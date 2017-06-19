@@ -40,7 +40,9 @@ class PowerTaggingSimilarBlock extends BlockBase {
    */
   public function build() {
     $block = array(
-      '#markup' => '',
+      '#cache' => array(
+        'max-age' => 0
+      )
     );
 
     if ($this->config) {
