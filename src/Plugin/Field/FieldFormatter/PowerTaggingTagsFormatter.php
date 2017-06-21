@@ -9,7 +9,9 @@ namespace Drupal\powertagging\Plugin\Field\FieldFormatter;
 
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Field\FormatterBase;
+use Drupal\powertagging\Entity\PowerTaggingConfig;
 use Drupal\powertagging\Plugin\Field\FieldType\PowerTaggingTagsItem;
+use Drupal\semantic_connector\SemanticConnector;
 use Drupal\taxonomy\Entity\Term;
 
 /**
@@ -60,18 +62,18 @@ class PowerTaggingTagsFormatter extends FormatterBase {
       }
       $terms = Term::loadMultiple($tag_ids);
       /** @var Term $term */
+      $tags_to_theme = array();
       foreach ($terms as $term) {
-        $uri = $term->urlInfo();
-        $elements[] = [
-          '#type' => 'link',
-          '#title' => $term->getName(),
-          '#url' => $uri,
-          '#options' => $uri->getOptions(),
-        ];
+        $uri = $term->get('field_uri')->getValue();
+        $tags_to_theme[] = array(
+          'uri' => (!empty($uri) ? $uri[0]['uri'] : ''),
+          'html' => \Drupal\Component\Utility\Html::escape($term->getName()),
+        );
       }
-      // TODO: adapt the output for our needs.
-      //$powertagging_config = PowerTaggingConfig::load($this->getFieldSettings()['powertagging_id']);
-      //$elements = semantic_connector_theme_concepts($tags_to_theme, $powertagging_config->connection->getId(), $powertagging_config->project_id);
+      $powertagging_config = PowerTaggingConfig::load($this->getFieldSetting('powertagging_id'));
+      $elements[] = array(
+        '#markup' => SemanticConnector::themeConcepts($tags_to_theme, $powertagging_config->getConnectionId(), $powertagging_config->getProjectId())
+      );
     }
 
     return $elements;
