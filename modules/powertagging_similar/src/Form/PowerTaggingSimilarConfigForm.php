@@ -295,11 +295,4 @@ class PowerTaggingSimilarConfigForm extends EntityForm {
 
     $form_state->setRedirectUrl(Url::fromRoute('entity.powertagging_similar.collection'));
   }
-
-  public function element_validate_integer_positive($element, FormStateInterface $form_state) {
-    $value = $element['#value'];
-    if ($value !== '' && (!is_numeric($value) || intval($value) != $value || $value <= 0)) {
-      $form_state->setErrorByName($element, t('%name must be a positive integer.', array('%name' => $element['#title'])));
-    }
-  }
 }

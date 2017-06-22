@@ -2,4 +2,4 @@ powertagging_similar.overview:
   route_name: entity.powertagging_similar.collection
   title: Similar Content
   base_route: entity.powertagging.collection
-  weight: 3
+  weight: 2
