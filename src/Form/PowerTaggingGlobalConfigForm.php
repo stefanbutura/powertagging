@@ -5,11 +5,6 @@ namespace Drupal\powertagging\Form;
 use Drupal\Component\Render\FormattableMarkup;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Link;
-use Drupal\Core\Url;
-use Drupal\pp_graphsearch\Entity\PPGraphSearchConfig;
-use Drupal\powertagging\PowerTagging;
-use Drupal\smart_glossary\Entity\SmartGlossaryConfig;
 
 /**
  * Configure global settings of the Semantic Connector module..
