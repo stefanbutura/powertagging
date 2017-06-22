@@ -282,7 +282,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
 
     switch ($field->getTargetEntityTypeId()) {
       case 'node':
-        $supported_fields['title'] = $field_definitions['title']->label() . '<span class="description">[Text field]</span>';
+        $supported_fields['title'] = $field_definitions['title']->getLabel()->render() . '<span class="description">[Text field]</span>';
         break;
 
       case 'taxonomy_term':
@@ -290,6 +290,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
         $supported_fields['description'] = t('Description') . '<span class="description">[' . t('Text area (multiple rows)') . ']</span>';
         break;
     }
+    /** @var \Drupal\Core\Field\BaseFieldDefinition $field_definition */
     foreach ($field_definitions as $field_definition) {
       if (!$field_definition instanceof FieldConfig) {
         continue;

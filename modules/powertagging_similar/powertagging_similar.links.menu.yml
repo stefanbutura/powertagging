@@ -1,0 +1,5 @@
+powertagging_similar.overview:
+  title: 'Similar Content'
+  route_name: entity.powertagging_similar.collection
+  description: 'Manage PowerTagging Similar Content widgets.'
+  parent: powertagging.overview
