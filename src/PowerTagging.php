@@ -6,6 +6,7 @@
  */
 
 namespace Drupal\powertagging;
+
 use Drupal\file\Entity\File;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
 use Drupal\semantic_connector\Api\SemanticConnectorPPXApi;
@@ -17,9 +18,12 @@ use Drupal\taxonomy\Entity\Term;
 class PowerTagging {
 
   protected $config;
+
   protected $config_settings;
-  /* @param SemanticConnectorPPXApi $PPXApi*/
+
+  /* @param SemanticConnectorPPXApi $PPXApi */
   protected $PPXApi;
+
   protected $result;
 
   /**
@@ -62,28 +66,28 @@ class PowerTagging {
     $project_config = $this->config_settings['project'];
     $corpus_id = isset($project_config['corpus_id']) ? $project_config['corpus_id'] : '';
 
-    $param = array(
+    $param = [
       'projectId' => $this->config->getProjectId(),
       'numberOfConcepts' => (int) $settings['concepts_per_extraction'],
       'numberOfTerms' => (int) $settings['freeterms_per_extraction'],
       'corpusScoring' => $corpus_id,
-    );
+    ];
 
-    $tags = array(
-      'content' => array(
-        'concepts' => array(),
-        'freeterms' => array(),
-      ),
-      'suggestion' => array(
-        'concepts' => array(),
-        'freeterms' => array(),
-      ),
-      'messages' => array(),
-    );
-    $suggestion = array(
-      'concepts' => array(),
-      'freeterms' => array(),
-    );
+    $tags = [
+      'content' => [
+        'concepts' => [],
+        'freeterms' => [],
+      ],
+      'suggestion' => [
+        'concepts' => [],
+        'freeterms' => [],
+      ],
+      'messages' => [],
+    ];
+    $suggestion = [
+      'concepts' => [],
+      'freeterms' => [],
+    ];
 
     // Find out what language to extract.
     $project_languages = $project_config['languages'];
@@ -95,7 +99,11 @@ class PowerTagging {
       if (!empty($settings['taxonomy_id'])) {
         // Remove line breaks and HTML tags from the content and convert HTML
         // characters to normal ones.
-        $content = trim(html_entity_decode(str_replace(array("\r", "\n", "\t"), "", strip_tags($content)), ENT_COMPAT, 'UTF-8'));
+        $content = trim(html_entity_decode(str_replace([
+          "\r",
+          "\n",
+          "\t",
+        ], "", strip_tags($content)), ENT_COMPAT, 'UTF-8'));
 
         if (!empty($content)) {
           $extraction = $this->PPXApi->extractConcepts($content, $project_languages[$settings['entity_language']], $param, 'text');
@@ -106,7 +114,7 @@ class PowerTagging {
         }
 
         if (!empty($files)) {
-          $tags['files'] = array();
+          $tags['files'] = [];
           foreach ($files as $file_id) {
             $file = File::load($file_id);
             // Use only existing files for tagging.
@@ -124,7 +132,7 @@ class PowerTagging {
       // Merge all extracted concepts and free terms for the suggestion.
       if (!empty($suggestion['concepts'])) {
         usort($suggestion['concepts'], [$this, 'sortByScore']);
-        $uris = array();
+        $uris = [];
         $count = 1;
         foreach ($suggestion['concepts'] as $tag) {
           if (in_array($tag['uri'], $uris)) {
@@ -139,7 +147,7 @@ class PowerTagging {
       }
       if (!empty($suggestion['freeterms'])) {
         usort($suggestion['freeterms'], [$this, 'sortByScore']);
-        $labels = array();
+        $labels = [];
         $count = 1;
         foreach ($suggestion['freeterms'] as $tag) {
           if (in_array($tag['label'], $labels)) {
@@ -155,10 +163,10 @@ class PowerTagging {
     }
 
     if (empty($tags['messages']) && empty($tags['suggestion']['concepts']) && empty($tags['suggestion']['freeterms'])) {
-      $tags['messages'][] = array(
+      $tags['messages'][] = [
         'type' => 'info',
         'message' => t('No concepts or free terms could be extracted from the entity\'s content.'),
-      );
+      ];
     }
 
     $this->result = $tags;
@@ -183,6 +191,216 @@ class PowerTagging {
       $this->addTermId($suggested_concepts, $project_settings['taxonomy_id'], 'concepts', $langcode);
     }
     $this->result = $suggested_concepts;
+  }
+
+  /**
+   * Update the powertagging tags of one powertagging field of a single entity.
+   *
+   * @param array $entity_ids
+   *   A single ID or an array of IDs of entities, depending on the entity type
+   * @param string $entity_type_id
+   *   The entity type ID of the entity (e.g. node, user, ...).
+   * @param string $field_type
+   *   The field type of the powertagging field.
+   * @param array $tag_settings
+   *   An array of settings used during the process of extraction.
+   * @param array $batch_info
+   *   An associative array of information about the batch process.
+   * @param array $context
+   *   The Batch context to transmit data between different calls.
+   */
+  public function tagContentBatchProcess(array $entity_ids, $entity_type_id, $field_type, array $tag_settings, array $batch_info, &$context) {
+    if (!isset($context['results']['processed'])) {
+      $context['results']['processed'] = 0;
+      $context['results']['tagged'] = 0;
+      $context['results']['skipped'] = 0;
+    }
+
+    // Load the entities.
+    $entities = \Drupal::entityTypeManager()
+      ->getStorage($entity_type_id)
+      ->loadMultiple($entity_ids);
+
+    /** @var \Drupal\Core\Entity\ContentEntityBase $entity */
+    // Go through all the entities
+    foreach ($entities as $entity) {
+      $context['results']['processed']++;
+
+      // Return if this entity does not need to be tagged.
+      if ($tag_settings['skip_tagged_content'] && $entity->hasField($field_type) &&
+        $entity->get($field_type)->count()
+      ) {
+        $context['results']['skipped']++;
+        continue;
+      }
+
+      // Build the content.
+      $tag_contents = [];
+      $file_ids = [];
+      foreach ($tag_settings['fields'] as $tag_field_name => $tag_type) {
+        if (!$entity->hasField($tag_field_name)) {
+          continue;
+        }
+
+
+        // Standard fields like "title".
+        if ($tag_type['module'] == 'standard field') {
+          $tag_contents[] = trim(strip_tags($entity->{$tag_field_name}));
+        }
+        // Custom fields
+        else {
+          if (empty($entity->{$tag_field_name})) {
+            continue;
+          }
+          $language_keys = array_keys($entity->{$tag_field_name});
+          $field_value_language = $entity->{$tag_field_name}[$language_keys[0]];
+          if (!empty($field_value_language) && is_array($field_value_language[0])) {
+            switch ($tag_type['module']) {
+              case 'text':
+                $tag_content = trim(strip_tags($field_value_language[0]['value']));
+                if ($tag_type['type'] == 'text_textarea_with_summary') {
+                  $tag_summary = trim(strip_tags($field_value_language[0]['summary']));
+                  if ($tag_summary != $tag_content) {
+                    $tag_contents[] = $tag_summary;
+                  }
+                }
+                $tag_contents[] = $tag_content;
+                break;
+
+              case 'file':
+              case 'media':
+                if (isset($field_value_language[0]['fid'])) {
+                  foreach ($field_value_language as $file) {
+                    $file_ids[] = $file['fid'];
+                  }
+                }
+                break;
+            }
+          }
+        }
+      }
+
+      // Get the language of the entity.
+      $tag_settings['entity_language'] = (powertagging_translation_possible() && isset($entity->language)) ? $entity->language : LANGUAGE_NONE;
+
+      // Get the concepts for the entity.
+      $extraction_result = powertagging_extract(implode(' ', $tag_contents), $file_ids, $tag_settings, 'array');
+
+      // Add already existing terms if required.
+      if (isset($tag_settings['default_tags_field']) && !empty($tag_settings['default_tags_field']) &&
+        isset($entity->{$tag_settings['default_tags_field']}) && !empty($entity->{$tag_settings['default_tags_field']})
+      ) {
+        $language_keys = array_keys($entity->{$tag_settings['default_tags_field']});
+        $field_values = $entity->{$tag_settings['default_tags_field']}[$language_keys[0]];
+        if (!empty($field_values)) {
+          $default_terms_ids = [];
+          foreach ($field_values as $field_value) {
+            if (isset($field_value['tid'])) {
+              $default_terms_ids[] = $field_value['tid'];
+            }
+          }
+
+          $terms = taxonomy_term_load_multiple($default_terms_ids);
+          foreach ($terms as $term) {
+            $low_term_name = strtolower($term->name);
+            $unique = TRUE;
+            foreach ($extraction_result['suggestion']['concepts'] as $concept) {
+              if (strtolower($concept['label']) == $low_term_name) {
+                $unique = FALSE;
+              }
+            }
+            if ($unique) {
+              foreach ($extraction_result['suggestion']['freeterms'] as $freeterm) {
+                if (strtolower($freeterm['label']) == $low_term_name) {
+                  $unique = FALSE;
+                }
+              }
+              if ($unique) {
+                $extraction_result['suggestion']['freeterms'][] = [
+                  'tid' => 0,
+                  'uri' => '',
+                  'label' => $term->name,
+                  'score' => 100,
+                  'type' => 'freeterm',
+                ];
+              }
+            }
+          }
+        }
+      }
+
+      $tids = powertagging_extraction_result_to_tids($tag_settings['powertagging_config'], $extraction_result, $tag_settings['taxonomy_id'], $tag_settings['entity_language']);
+
+      // Bring the tids into the correct format for a entity.
+      $field_value_tids = [];
+      foreach ($tids as $tid) {
+        $field_value_tids[] = [
+          'tid' => (string) $tid,
+        ];
+      }
+
+      // Save the PowerTagging tags to the entity.
+      switch ($entity_type) {
+        case 'node':
+          if (!empty($field_value_tids)) {
+            $entity->{$field_name}[LANGUAGE_NONE] = $field_value_tids;
+          }
+          else {
+            $entity->{$field_name} = [];
+          }
+          node_save($entity);
+
+          //drupal_set_message(t('Node "%entitytitle" was retagged successfully.', array('%entitytitle' => $entity->title)));
+          break;
+
+        case 'user':
+          $user_edit_data = [];
+          if (!empty($field_value_tids)) {
+            $user_edit_data[$field_name][LANGUAGE_NONE] = $field_value_tids;
+          }
+          else {
+            $user_edit_data[$field_name] = [];
+          }
+          user_save($entity, $user_edit_data);
+
+          //drupal_set_message(t('User "%entitytitle" was retagged successfully.', array('%entitytitle' => $entity->name)));
+          break;
+
+        case 'taxonomy_term':
+          if (!empty($field_value_tids)) {
+            $entity->{$field_name}[LANGUAGE_NONE] = $field_value_tids;
+          }
+          else {
+            $entity->{$field_name} = [];
+          }
+          taxonomy_term_save($entity);
+
+          //drupal_set_message(t('Taxonomy term "%entitytitle" was retagged successfully.', array('%entitytitle' => $entity->name)));
+          break;
+      }
+
+      $context['results']['tagged']++;
+    }
+
+    // Show the remaining time as a batch message.
+    $time_string = '';
+    if ($context['results']['processed'] > 0) {
+      $remaining_time = floor((time() - $batch_info['start_time']) / $context['results']['processed'] * ($batch_info['total'] - $context['results']['processed']));
+      if ($remaining_time > 0) {
+        $time_string = (floor($remaining_time / 86400)) . 'd ' . (floor($remaining_time / 3600) % 24) . 'h ' . (floor($remaining_time / 60) % 60) . 'm ' . ($remaining_time % 60) . 's';
+      }
+      else {
+        $time_string = t('Done.');
+      }
+    }
+
+    $context['message'] = t('Processed entities: %currententities of %totalentities. (Tagged: %taggedentities, Skipped: %skippedentities)', [
+          '%currententities' => $context['results']['processed'],
+          '%taggedentities' => $context['results']['tagged'],
+          '%skippedentities' => $context['results']['skipped'],
+          '%totalentities' => $batch_info['total'],
+        ]
+      ) . '<br />' . t('Remaining time: %remainingtime.', ['%remainingtime' => $time_string]);
   }
 
   /**
@@ -283,7 +501,7 @@ class PowerTagging {
     switch ($type) {
       case 'concepts':
         // Get all concept uris.
-        $uris = array();
+        $uris = [];
         foreach ($concepts as $concept) {
           $uris[] = $concept->uri;
         }
@@ -318,7 +536,7 @@ class PowerTagging {
 
       case 'free_terms':
         // Get all concept uris.
-        $labels = array();
+        $labels = [];
         foreach ($concepts as $concept) {
           $labels[] = $concept->textValue;
         }

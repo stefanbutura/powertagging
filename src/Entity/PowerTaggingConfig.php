@@ -6,6 +6,7 @@
  */
 
 namespace Drupal\powertagging\Entity;
+
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\semantic_connector\SemanticConnector;
 
@@ -18,7 +19,8 @@ use Drupal\semantic_connector\SemanticConnector;
  *   handlers = {
  *     "list_builder" = "Drupal\powertagging\PowerTaggingConfigListBuilder",
  *     "form" = {
- *       "default" = "Drupal\powertagging\Form\PowerTaggingConfigConnectionForm",
+ *       "default" =
+ *   "Drupal\powertagging\Form\PowerTaggingConfigConnectionForm",
  *       "add" = "Drupal\powertagging\Form\PowerTaggingConfigConnectionForm",
  *       "edit" = "Drupal\powertagging\Form\PowerTaggingConfigConnectionForm",
  *       "edit_config" = "Drupal\powertagging\Form\PowerTaggingConfigForm",
@@ -37,10 +39,14 @@ use Drupal\semantic_connector\SemanticConnector;
  *   },
  *   links = {
  *     "add-form" = "/admin/config/semantic-drupal/powertagging/add",
- *     "edit-form" = "/admin/config/semantic-drupal/powertagging/{powertagging}",
- *     "edit-config-form" = "/admin/config/semantic-drupal/powertagging/{powertagging}/config",
- *     "delete-form" = "/admin/config/semantic-drupal/powertagging/{powertagging}/delete",
- *     "clone-form" = "/admin/config/semantic-drupal/powertagging/{powertagging}/clone",
+ *     "edit-form" =
+ *   "/admin/config/semantic-drupal/powertagging/{powertagging}",
+ *     "edit-config-form" =
+ *   "/admin/config/semantic-drupal/powertagging/{powertagging}/config",
+ *     "delete-form" =
+ *   "/admin/config/semantic-drupal/powertagging/{powertagging}/delete",
+ *     "clone-form" =
+ *   "/admin/config/semantic-drupal/powertagging/{powertagging}/clone",
  *     "collection" = "/admin/config/semantic-drupal/powertagging"
  *   },
  *   config_export = {
@@ -55,10 +61,15 @@ use Drupal\semantic_connector\SemanticConnector;
 class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigInterface {
 
   protected $id;
+
   protected $title;
+
   protected $connection_id;
+
   protected $project_id;
+
   protected $config;
+
   /** @var \Drupal\semantic_connector\Entity\SemanticConnectorPPServerConnection $connection */
   protected $connection;
 
@@ -75,7 +86,8 @@ class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigI
       $this->config = [];
     }
     else {
-      $connection_overrides = \Drupal::config('semantic_connector.settings')->get('override_connections');
+      $connection_overrides = \Drupal::config('semantic_connector.settings')
+        ->get('override_connections');
       if (isset($connection_overrides[$this->id()])) {
         $overrides = $connection_overrides[$this->id()];
         if (isset($overrides['connection_id'])) {
@@ -183,7 +195,7 @@ class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigI
    *   Return a array with all (or one) configuration set.
    */
   public static function loadConfigs($connection_id = '', $only_available_services = FALSE) {
-    $configurations = array();
+    $configurations = [];
     $config_query = \Drupal::entityQuery('PowerTaggingConfig');
 
     if (!empty($connection_id)) {
@@ -195,7 +207,9 @@ class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigI
 
     /** @var PowerTaggingConfig $powertagging_config */
     foreach ($powertagging_configs as $powertagging_config) {
-      if (!$only_available_services || $powertagging_config->getConnection()->available()) {
+      if (!$only_available_services || $powertagging_config->getConnection()
+          ->available()
+      ) {
         $configurations[] = $powertagging_config;
       }
     }
@@ -218,7 +232,7 @@ class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigI
    * @return PowerTaggingConfig
    *   The new PowerTagging configuration.
    */
-  public static function createConfig($title, $project_id, $connection_id, array $config = array()) {
+  public static function createConfig($title, $project_id, $connection_id, array $config = []) {
     $configuration = static::create();
     $configuration->set('id', SemanticConnector::createUniqueEntityMachineName('powertagging', $title));
     $configuration->setTitle($title);
@@ -272,7 +286,8 @@ class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigI
         foreach ($field['bundles'] as $bundle) {
           /** @var \Drupal\field\Entity\FieldConfig $field_definition */
           $field_definition = $entityFieldManager->getFieldDefinitions($entity_type_id, $bundle)[$field_type];
-          $powertagging_id = $field_definition->getFieldStorageDefinition()->getSetting('powertagging_id');
+          $powertagging_id = $field_definition->getFieldStorageDefinition()
+            ->getSetting('powertagging_id');
           if ($powertagging_id == $this->id()) {
             $powertagging_fields[] = [
               'entity_type_id' => $entity_type_id,
@@ -311,12 +326,15 @@ class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigI
         $items = [];
         foreach ($fields as $field) {
           if ($field['entity_type_id'] == 'user') {
-            $items[] = t('User');
-          }
+            $items[] = t('User (@label)', [
+              '@label' => $field['label'],
+            ]);          }
           else {
-            $type_label = $entityTypeManager->getStorage($field['entity_type_id'])->getEntityType()->getBundleLabel();
+            $type_label = $entityTypeManager->getStorage($field['entity_type_id'])
+              ->getEntityType()
+              ->getBundleLabel();
             $bundle_labels = $bundleInfo->getBundleInfo($field['entity_type_id']);
-            $items[] = t('@entity_type "@bundle" [@label]', [
+            $items[] = t('@entity_type "@bundle" (@label)', [
               '@entity_type' => $type_label,
               '@bundle' => $bundle_labels[$field['bundle']]['label'],
               '@label' => $field['label'],
@@ -335,12 +353,16 @@ class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigI
         $list = [];
         foreach ($fields as $field) {
           if ($field['entity_type_id'] == 'user') {
-            $option_title = t('User');
+            $option_title = t('User (@label)', [
+              '@label' => $field['label'],
+            ]);
           }
           else {
-            $type_label = $entityTypeManager->getStorage($field['entity_type_id'])->getEntityType()->getBundleLabel();
+            $type_label = $entityTypeManager->getStorage($field['entity_type_id'])
+              ->getEntityType()
+              ->getBundleLabel();
             $bundle_labels = $bundleInfo->getBundleInfo($field['entity_type_id']);
-            $option_title = t('@entity_type "@bundle" [@label]', [
+            $option_title = t('@entity_type "@bundle" (@label)', [
               '@entity_type' => $type_label,
               '@bundle' => $bundle_labels[$field['bundle']]['label'],
               '@label' => $field['label'],
@@ -381,7 +403,7 @@ class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigI
     /** @var \Drupal\Core\Entity\EntityFieldManager $entityFieldManager */
     $entityFieldManager = \Drupal::service('entity_field.manager');
     $fields = $this->getFields();
-    foreach($fields as $field) {
+    foreach ($fields as $field) {
       /** @var \Drupal\field\Entity\FieldConfig $field_definition */
       $field_definition = $entityFieldManager->getFieldDefinitions($field['entity_type_id'], $field['bundle'])[$field['field_type']];
       $field_definition->delete();

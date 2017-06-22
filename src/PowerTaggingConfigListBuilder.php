@@ -100,6 +100,20 @@ class PowerTaggingConfigListBuilder extends ConfigEntityListBuilder {
         'weight' => 1000,
       );
     }
+    if ($entity->access('update')) {
+      $operations['tag_content'] = array(
+        'title' => t('Tag content'),
+        'url' => Url::fromRoute('entity.powertagging.tag_content', array('powertagging_config' => $entity->id())),
+        'weight' => 1000,
+      );
+    }
+    if ($entity->access('update')) {
+      $operations['update_vocabulary'] = array(
+        'title' => t('Update vocabulary'),
+        'url' => Url::fromRoute('entity.powertagging.update_vocabulary', array('powertagging_config' => $entity->id())),
+        'weight' => 1000,
+      );
+    }
 
     return $operations;
   }
