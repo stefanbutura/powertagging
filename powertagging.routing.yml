@@ -34,6 +34,14 @@ entity.powertagging.update_vocabulary:
       powertagging_config:
         type: entity:powertagging
 
+powertagging.config:
+  path: '/admin/config/semantic-drupal/powertagging/config'
+  defaults:
+    _form: '\Drupal\powertagging\Form\PowerTaggingGlobalConfigForm'
+    _title: 'Global configuration'
+  requirements:
+    _permission: 'administer powertagging'
+
 powertagging.autocomplete_tags:
   path: '/powertagging/autocomplete-tags/{powertagging_config}/{langcode}'
   defaults:
