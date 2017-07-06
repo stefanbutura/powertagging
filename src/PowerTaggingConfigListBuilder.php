@@ -5,6 +5,7 @@
  */
 
 namespace Drupal\powertagging;
+
 use Drupal\Component\Render\FormattableMarkup;
 use Drupal\Core\Config\Entity\ConfigEntityListBuilder;
 use Drupal\Core\Entity\EntityInterface;
@@ -57,9 +58,11 @@ class PowerTaggingConfigListBuilder extends ConfigEntityListBuilder {
     $row['title'] = new FormattableMarkup('<div class="semantic-connector-led" data-server-id="@connectionid" data-server-type="pp-server" title="@servicetitle"></div>@entitytitle', [
       '@connectionid' => $entity->getConnection()->id(),
       '@servicetitle' => t('Checking service'),
-      '@entitytitle' => $entity->getTitle()
+      '@entitytitle' => $entity->getTitle(),
     ]);
-    $row['server'] = Link::fromTextAndUrl($entity->getConnection()->getTitle(), Url::fromUri($entity->getConnection()->getUrl() . '/PoolParty'));
+    $row['server'] = Link::fromTextAndUrl($entity->getConnection()
+      ->getTitle(), Url::fromUri($entity->getConnection()
+        ->getUrl() . '/PoolParty'));
     $row['project'] = $project_label;
     $row['available'] = $fields_list;
 
@@ -78,41 +81,42 @@ class PowerTaggingConfigListBuilder extends ConfigEntityListBuilder {
    *   self::getOperations().
    */
   public function getDefaultOperations(EntityInterface $entity) {
-    $operations = array();
+    $operations = [];
     if ($entity->access('update') && $entity->hasLinkTemplate('edit-config-form')) {
-      $operations['edit'] = array(
+      $operations['edit'] = [
         'title' => t('Edit'),
-        'url' => Url::fromRoute('entity.powertagging.edit_config_form', array('powertagging' => $entity->id())),
+        'url' => Url::fromRoute('entity.powertagging.edit_config_form', ['powertagging' => $entity->id()]),
         'weight' => 10,
-      );
+      ];
     }
     if ($entity->access('delete') && $entity->hasLinkTemplate('delete-form')) {
-      $operations['delete'] = array(
+      $operations['delete'] = [
         'title' => t('Delete'),
-        'url' => Url::fromRoute('entity.powertagging.delete_form', array('powertagging' => $entity->id())),
+        'url' => Url::fromRoute('entity.powertagging.delete_form', ['powertagging' => $entity->id()]),
         'weight' => 100,
-      );
+      ];
     }
     if ($entity->access('create') && $entity->hasLinkTemplate('clone-form')) {
-      $operations['clone'] = array(
+      $operations['clone'] = [
         'title' => t('Clone'),
-        'url' => Url::fromRoute('entity.powertagging.clone_form', array('powertagging' => $entity->id())),
+        'url' => Url::fromRoute('entity.powertagging.clone_form', ['powertagging' => $entity->id()]),
         'weight' => 1000,
-      );
+      ];
     }
+    $destination = \Drupal::destination()->get();
     if ($entity->access('update')) {
-      $operations['tag_content'] = array(
+      $operations['tag_content'] = [
         'title' => t('Tag content'),
-        'url' => Url::fromRoute('entity.powertagging.tag_content', array('powertagging_config' => $entity->id())),
+        'url' => Url::fromRoute('entity.powertagging.tag_content', ['powertagging_config' => $entity->id()], ['query' => ['destination' => $destination]]),
         'weight' => 1000,
-      );
+      ];
     }
     if ($entity->access('update')) {
-      $operations['update_vocabulary'] = array(
+      $operations['update_vocabulary'] = [
         'title' => t('Update vocabulary'),
-        'url' => Url::fromRoute('entity.powertagging.update_vocabulary', array('powertagging_config' => $entity->id())),
+        'url' => Url::fromRoute('entity.powertagging.update_vocabulary', ['powertagging_config' => $entity->id()], ['query' => ['destination' => $destination]]),
         'weight' => 1000,
-      );
+      ];
     }
 
     return $operations;

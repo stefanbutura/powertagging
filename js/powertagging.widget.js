@@ -17,16 +17,28 @@
           $(this).autocomplete({
             source: drupalSettings.path.baseUrl + "powertagging/autocomplete-tags/" + settings.settings.powertagging_id + '/' + settings.settings.entity_language,
             minLength: 2,
-            select: function( event, ui ) {
+            select: function (event, ui) {
               event.preventDefault();
-              PTContainers.resultArea(pt_field_id).addTag({tid: ui.item.tid, uri: ui.item.uri, label: ui.item.label, type: ui.item.type});
+              PTContainers.resultArea(pt_field_id).addTag({
+                tid: ui.item.tid,
+                uri: ui.item.uri,
+                label: ui.item.label,
+                type: ui.item.type,
+                score: 100
+              });
               $(this).val('');
             }
-          }).keyup(function(e){
+          }).keyup(function (e) {
             if (e.keyCode === 13) {
               var field_value = jQuery.trim($(this).val());
               if (field_value.length > 0) {
-                PTContainers.resultArea(pt_field_id).addTag({tid: 0, uri: '', label: field_value, type: "freeterm"});
+                PTContainers.resultArea(pt_field_id).addTag({
+                  tid: 0,
+                  uri: '',
+                  label: field_value,
+                  type: "freeterm",
+                  score: 100
+                });
                 $(this).autocomplete("close");
                 $(this).val("");
               }
@@ -38,8 +50,8 @@
       /**
        * Set the "click" event to the "Get tags" button.
        */
-      $(context).find("div.field--type-powertagging-tags").once("powertagging_widget").each(function() {
-        $(this).find("input[type=\"submit\"]").click(function(event) {
+      $(context).find("div.field--type-powertagging-tags").once("powertagging_widget").each(function () {
+        $(this).find("input[type=\"submit\"]").click(function (event) {
           event.preventDefault();
 
           var pt_field_id = $(this).data('drupal-selector').replace(/^edit-(.*)-powertagging-get-tags$/, "$1").replace(/-/g, "_");
@@ -55,7 +67,7 @@
        * Set the change event of the language switcher.
        */
       $(context).find("#edit-langcode-wrapper").once("powertagging_widget").each(function () {
-        $(this).find("select, input").change(function() {
+        $(this).find("select, input").change(function () {
           var language = '';
           // Language selection as a select-element.
           if ($(this).is('select')) {
@@ -66,7 +78,7 @@
             language = $(this).find('input:checked').val();
           }
 
-          Object.getOwnPropertyNames(drupalSettings.powertagging).forEach(function(pt_field_id) {
+          Object.getOwnPropertyNames(drupalSettings.powertagging).forEach(function (pt_field_id) {
             drupalSettings.powertagging[pt_field_id].settings.entity_language = language;
             var settings = drupalSettings.powertagging[pt_field_id];
             var html_field_id = "#edit-" + pt_field_id.replace(/_/g, '-') + "-wrapper";
@@ -74,11 +86,11 @@
 
             // Update the autocomplete path.
             $(html_field_id).find("input.powertagging_autocomplete_tags").autocomplete(
-              'option', 'source', drupalSettings.path.baseUrl + "powertagging/autocomplete-tags/" + settings.settings.powertagging_id + '/' + settings.settings.entity_language
+                'option', 'source', drupalSettings.path.baseUrl + "powertagging/autocomplete-tags/" + settings.settings.powertagging_id + '/' + settings.settings.entity_language
             );
           });
         });
-     });
+      });
 
       /**
        * Collect all the data into an object for the extraction.
@@ -94,7 +106,7 @@
         var data = {settings: settings.settings, content: "", files: []};
 
         // Build the text content to extract tags from.
-        $.each(settings.fields, function(field_index, field) {
+        $.each(settings.fields, function (field_index, field) {
           switch (field.module) {
             case "core":
             case "text":
@@ -128,7 +140,7 @@
        * @return {string}
        *   The entered text from this field.
        */
-      function collectContentText (field, widget) {
+      function collectContentText(field, widget) {
         var field_id = "#edit-" + field.replace(/_/g, "-") + "-wrapper";
         var content = "";
 
@@ -142,7 +154,7 @@
           case "text_textarea":
           case "text_textarea_with_summary":
             // Get the text from the summary and the full text.
-            $(field_id + " textarea").each(function() {
+            $(field_id + " textarea").each(function () {
               var textarea_id = $(this).attr("id");
               // CkEditor.
               if (typeof(CKEDITOR) !== "undefined" && CKEDITOR.hasOwnProperty("instances") && CKEDITOR.instances.hasOwnProperty(textarea_id)) {
@@ -150,7 +162,7 @@
               }
               // TinyMCE.
               else if (typeof(tinyMCE) !== "undefined" && tinyMCE.hasOwnProperty("editors") && tinyMCE.editors.hasOwnProperty(textarea_id)) {
-                content += tinyMCE.editors[textarea_id].getContent({format : "raw"});
+                content += tinyMCE.editors[textarea_id].getContent({format: "raw"});
               }
               // No text editor or an unsupported one.
               else {
@@ -174,14 +186,14 @@
        * @return {Array}
        *   The uploaded files from this field.
        */
-      function collectContentFile (field, widget) {
+      function collectContentFile(field, widget) {
         var field_id = "#edit-" + field.replace(/_/g, "-") + "-wrapper";
         var files = [];
 
         switch (widget) {
           case "file_generic":
           case "media_generic":
-            $(field_id + " input[type=hidden]").each(function() {
+            $(field_id + " input[type=hidden]").each(function () {
               if ($(this).attr("name").indexOf("[fids]") > 0 && $(this).val() > 0) {
                 files.push($(this).val());
               }
@@ -212,13 +224,15 @@
 
         // Render the tags if no message is given.
         if (!tags.hasOwnProperty("messages") || tags.messages.length === 0) {
-          var rendered_tags = [];
           var tags_container = '';
+          var rendered_tags;
 
           // Render the content tags.
           if (tags.hasOwnProperty("content")) {
             var content_tags = tags.content.concepts.concat(tags.content.freeterms);
             if (content_tags.length) {
+              rendered_tags = [];
+
               content_tags.forEach(function (tag) {
                 rendered_tags.push(renderTag(tag));
               });
@@ -235,7 +249,9 @@
               if (tags.files.hasOwnProperty(file_name)) {
                 var file_tags = tags.files[file_name].concepts.concat(tags.files[file_name].freeterms);
                 if (file_tags.length) {
-                  file_tags.forEach(function(tag) {
+                  rendered_tags = [];
+
+                  file_tags.forEach(function (tag) {
                     rendered_tags.push(renderTag(tag));
                   });
 
@@ -252,7 +268,7 @@
 
           // There are already tags connected with this node.
           if (settings.hasOwnProperty("selected_tags") && settings.selected_tags.length) {
-            settings.selected_tags.forEach(function(tag) {
+            settings.selected_tags.forEach(function (tag) {
               result_tags.push(tag);
             });
           }
@@ -260,21 +276,22 @@
           else if (tags.hasOwnProperty("suggestion")) {
             var suggestion_tags = tags.suggestion.concepts.concat(tags.suggestion.freeterms);
             if (suggestion_tags.length) {
-              suggestion_tags.forEach(function(tag) {
+              suggestion_tags.forEach(function (tag) {
                 result_tags.push(tag);
               });
             }
           }
 
           // Add the tags to the result.
-          result_tags.forEach(function(result_tag) {
+          result_tags.forEach(function (result_tag) {
             PTContainers.resultArea(pt_field_id).addTag(result_tag);
           });
         }
-        // There are errors or infos available --> show them instead of the tags.
+        // There are errors or infos available --> show them instead of the
+        // tags.
         else {
           var messages_html = '';
-          tags.messages.forEach(function(message){
+          tags.messages.forEach(function (message) {
             messages_html += '<div class="messages messages--' + message.type + '">' + message.message + '</div>';
           });
           PTContainers.extractionArea(pt_field_id).append(messages_html).show();
@@ -296,7 +313,7 @@
        */
       function renderTag(tag) {
         var score = tag.score ? ' (' + tag.score + ')' : '';
-        return '<div class="powertagging-tag ' + tag.type + '" data-tid="' + tag.tid + '" data-label="' + tag.label + '" data-uri="' + tag.uri + '">' + tag.label + score + '</div>';
+        return '<div class="powertagging-tag ' + tag.type + '" data-tid="' + tag.tid + '" data-label="' + tag.label + '" data-uri="' + tag.uri + '" data-score="' + tag.score + '">' + tag.label + score + '</div>';
       }
 
       /**
@@ -310,7 +327,13 @@
        */
       function tagElementToObject(tag_element) {
         var type = tag_element.hasClass('concept') ? 'concept' : 'freeterm';
-        return {tid: tag_element.attr("data-tid"), uri: tag_element.attr("data-uri"), label: tag_element.attr("data-label"), type: type};
+        return {
+          tid: tag_element.attr("data-tid"),
+          uri: tag_element.attr("data-uri"),
+          label: tag_element.attr("data-label"),
+          type: type,
+          score: tag_element.attr("data-score")
+        };
       }
 
       /**
@@ -350,7 +373,7 @@
        * @param {string} pt_field_id
        *   The PowerTagging field ID.
        */
-      Containers.prototype.add = function(pt_field_id) {
+      Containers.prototype.add = function (pt_field_id) {
         var pt_field = "#edit-" + pt_field_id.replace(/_/g, "-") + "-wrapper";
         this.containers["extraction"][pt_field_id] = new ExtractionContainer(pt_field_id, pt_field);
         this.containers["result"][pt_field_id] = new ResultContainer(pt_field_id, pt_field);
@@ -400,7 +423,7 @@
       /**
        * Shows the extraction container.
        */
-      ExtractionContainer.prototype.show = function() {
+      ExtractionContainer.prototype.show = function () {
         $(this.field).slideDown();
         $(this.field).prev().slideUp();
         $(this.field).parent().slideDown();
@@ -409,7 +432,7 @@
       /**
        * Hides the extraction container.
        */
-      ExtractionContainer.prototype.hide = function() {
+      ExtractionContainer.prototype.hide = function () {
         $(this.field).parent().hide();
         $(this.field).prev().hide();
         $(this.field).hide();
@@ -418,7 +441,7 @@
       /**
        * Shows the loading sign.
        */
-      ExtractionContainer.prototype.loading = function() {
+      ExtractionContainer.prototype.loading = function () {
         $(this.field).slideUp().html("");
         $(this.field).prev().slideDown();
         $(this.field).parent().slideDown();
@@ -432,7 +455,7 @@
        *
        * @return {ExtractionContainer}
        */
-      ExtractionContainer.prototype.append = function(html) {
+      ExtractionContainer.prototype.append = function (html) {
         $(this.field).append(html);
         return this;
       };
@@ -443,7 +466,7 @@
        * @param {Object} tag
        *   The tag object.
        */
-      ExtractionContainer.prototype.disableTag = function(tag) {
+      ExtractionContainer.prototype.disableTag = function (tag) {
         if (tag.tid > 0) {
           $(this.field + ' .powertagging-tag[data-tid="' + tag.tid + '"]').addClass("disabled");
         }
@@ -458,7 +481,7 @@
        * @param {Object} tag
        *   The tag object.
        */
-      ExtractionContainer.prototype.enableTag = function(tag) {
+      ExtractionContainer.prototype.enableTag = function (tag) {
         if (tag.tid > 0) {
           $(this.field + ' .powertagging-tag[data-tid="' + tag.tid + '"]').removeClass("disabled");
         }
@@ -468,12 +491,34 @@
       };
 
       /**
+       * Get the highest score for all the same extracted tags.
+       *
+       * @param {Object} tag
+       *   The tag object.
+       */
+      ExtractionContainer.prototype.getHighestScore = function (tag) {
+        var tags = [];
+        if (tag.tid > 0) {
+          tags = $(this.field + ' .powertagging-tag[data-tid="' + tag.tid + '"]');
+        }
+        else {
+          tags = $(this.field + ' .powertagging-tag[data-label="' + tag.label + '"]');
+        }
+        tags.each(function (index) {
+          var score = $(this).attr('data-score');
+          if (parseInt(score) > parseInt(tag.score)) {
+            tag.score = score;
+          }
+        });
+      };
+
+      /**
        * Adds the click event to all the tags in the extracted tags list.
        */
-      ExtractionContainer.prototype.addClick = function() {
+      ExtractionContainer.prototype.addClick = function () {
         var pt_field_id = this.pt_field_id;
-        $(this.field + " .powertagging-tag").once("powertagging_widget").each(function() {
-          $(this).click(function() {
+        $(this.field + " .powertagging-tag").once("powertagging_widget").each(function () {
+          $(this).click(function () {
             if ($(this).hasClass('disabled')) {
               PTContainers.resultArea(pt_field_id).removeTag(tagElementToObject($(this)));
             }
@@ -506,12 +551,12 @@
        * @param {Object} tag
        *   The tag object.
        */
-      ResultContainer.prototype.addTag = function(tag) {
+      ResultContainer.prototype.addTag = function (tag) {
         var field = this.field;
 
         // Only add tags, that are not already inside the results area.
         if ((tag.tid > 0 && $(field + ' .powertagging-tag[data-tid="' + tag.tid + '"]').length === 0) ||
-          (tag.tid === 0 && ($(field + ' .powertagging-tag[data-label="' + tag.label + '"]').length === 0 || tag.uri !== ""))) {
+            (tag.tid === 0 && ($(field + ' .powertagging-tag[data-label="' + tag.label + '"]').length === 0 || tag.uri !== ""))) {
 
           // Add a new list if this is the first tag to add.
           if ($(field + " ul").length === 0) {
@@ -525,11 +570,12 @@
           }
 
           // Add a new list item to the result.
+          PTContainers.extractionArea(this.pt_field_id).getHighestScore(tag);
           $(field + " ul").append("<li>" + renderTag(tag) + "</li>");
 
           // Add a click handler to the new result tag.
           var thisContainer = this;
-          $(field + " li:last-child .powertagging-tag").click(function() {
+          $(field + " li:last-child .powertagging-tag").click(function () {
             thisContainer.removeTag(tagElementToObject($(this)));
           });
 
@@ -547,7 +593,7 @@
        * @param {Object} tag
        *   The tag object.
        */
-      ResultContainer.prototype.removeTag = function(tag) {
+      ResultContainer.prototype.removeTag = function (tag) {
         var field = this.field;
 
         // Remove tag from the list.
@@ -585,16 +631,18 @@
       /**
        * Updates the value field for the tags.
        */
-      ResultContainer.prototype.updateFieldValue = function() {
+      ResultContainer.prototype.updateFieldValue = function () {
         var tags_to_save = [];
+        var tag = '';
         // Use tid for existing terms and label for new free terms.
-        $(this.field + " .powertagging-tag").each(function() {
+        $(this.field + " .powertagging-tag").each(function () {
           if ($(this).attr("data-tid") > 0) {
-            tags_to_save.push($(this).attr("data-tid"));
+            tag = $(this).attr("data-tid");
           }
           else {
-            tags_to_save.push($(this).attr("data-label").replace(',', ';') + '|' + $(this).attr("data-uri"));
+            tag = $(this).attr("data-label").replace(',', ';') + '|' + $(this).attr("data-uri");
           }
+          tags_to_save.push(tag + '#' + $(this).attr("data-score"));
         });
 
         $(this.pt_field).find("input.powertagging_tag_string").val(tags_to_save.join(','));
@@ -605,8 +653,8 @@
        */
       ResultContainer.prototype.addClick = function () {
         var thisContainer = this;
-        $(this.field + " .powertagging-tag").once("powertagging_widget").each(function() {
-          $(this).click(function() {
+        $(this.field + " .powertagging-tag").once("powertagging_widget").each(function () {
+          $(this).click(function () {
             thisContainer.removeTag(tagElementToObject($(this)));
           });
         });
@@ -618,7 +666,7 @@
       $(document).ready(function () {
         // Initialize the PowerTagging fields if it is shown in a form.
         if (typeof drupalSettings.powertagging !== 'undefined' && $("#edit-default-value-input").length === 0) {
-          Object.getOwnPropertyNames(drupalSettings.powertagging).forEach(function(pt_field_id) {
+          Object.getOwnPropertyNames(drupalSettings.powertagging).forEach(function (pt_field_id) {
             PTContainers.add(pt_field_id);
             renderResult(pt_field_id, []);
           });

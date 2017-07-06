@@ -23,10 +23,9 @@ use Drupal\powertagging\Form\PowerTaggingConfigForm;
  * @FieldType(
  *   id = "powertagging_tags",
  *   label = @Translation("PowerTagging Tags"),
- *   description = @Translation("An entity field containing a taxonomy term reference."),
- *   category = @Translation("Reference"),
- *   default_widget = "powertagging_tags_default",
- *   default_formatter = "powertagging_tags_list",
+ *   description = @Translation("An entity field containing a taxonomy term
+ *   reference."), category = @Translation("Reference"), default_widget =
+ *   "powertagging_tags_default", default_formatter = "powertagging_tags_list",
  * )
  */
 class PowerTaggingTagsItem extends FieldItemBase {
@@ -53,16 +52,9 @@ class PowerTaggingTagsItem extends FieldItemBase {
       ],
       'file' => [
         'file' => 'file_generic',
-      ]
+      ],
     ];
   }
-
-  /**
-   * {@inheritdoc}
-  public static function mainPropertyName() {
-    return 'target_id';
-  }
-   */
 
   /**
    * {@inheritdoc}
@@ -75,10 +67,17 @@ class PowerTaggingTagsItem extends FieldItemBase {
           'type' => 'int',
           'unsigned' => TRUE,
         ],
+        'score' => [
+          'description' => 'The score of the taxonomy term for this entity.',
+          'type' => 'int',
+          'unsigned' => TRUE,
+          'not null' => TRUE,
+          'default' => 0,
+        ],
       ],
-      'indexes' => array(
-        'target_id' => array('target_id'),
-      ),
+      'indexes' => [
+        'target_id' => ['target_id'],
+      ],
     ];
 
     return $schema;
@@ -88,11 +87,15 @@ class PowerTaggingTagsItem extends FieldItemBase {
    * {@inheritdoc}
    */
   public static function propertyDefinitions(FieldStorageDefinitionInterface $field_definition) {
-    $target_type_info = \Drupal::entityTypeManager()->getDefinition('taxonomy_term');
+    $target_type_info = \Drupal::entityTypeManager()
+      ->getDefinition('taxonomy_term');
 
     $properties['target_id'] = DataDefinition::create('integer')
       ->setLabel(t('@label ID', ['@label' => $target_type_info->getLabel()]))
-      ->setSetting('unsigned', TRUE);
+      ->setRequired(TRUE);
+    $properties['score'] = DataDefinition::create('integer')
+      ->setLabel(t('Score'))
+      ->setRequired(TRUE);
 
     return $properties;
   }
@@ -145,11 +148,11 @@ class PowerTaggingTagsItem extends FieldItemBase {
     else {
       $url = URL::fromRoute('entity.powertagging.collection');
       $description = t('No PowerTagging configuration found.') . '<br />';
-      $description .= t('Please create it first in the <a href="@url">PowerTagging configuration</a> area.', array('@url' => $url->toString()));
+      $description .= t('Please create it first in the <a href="@url">PowerTagging configuration</a> area.', ['@url' => $url->toString()]);
       drupal_set_message(t('No PowerTagging configuration found for the selection below.'), 'error');
     }
 
-    $element['powertagging_id'] = array(
+    $element['powertagging_id'] = [
       '#type' => 'select',
       '#title' => t('Select the PowerTagging configuration'),
       '#description' => $description,
@@ -158,7 +161,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
       '#required' => TRUE,
       '#disabled' => $has_data,
       '#size' => 1,
-    );
+    ];
 
     return $element;
   }
@@ -184,7 +187,8 @@ class PowerTaggingTagsItem extends FieldItemBase {
     $form = [];
 
     // Check if the entity type has taxonomy term references.
-    $field_definitions = \Drupal::service('entity_field.manager')->getFieldDefinitions($field->getTargetEntityTypeId(), $field->getTargetBundle());
+    $field_definitions = \Drupal::service('entity_field.manager')
+      ->getFieldDefinitions($field->getTargetEntityTypeId(), $field->getTargetBundle());
     $term_references = ['' => '- None -'];
     foreach ($field_definitions as $field_definition) {
       if ($field_definition instanceof FieldConfig && $field_definition->getType() == 'entity_reference') {
@@ -224,8 +228,10 @@ class PowerTaggingTagsItem extends FieldItemBase {
       '#open' => TRUE,
     ];
 
-    $powertagging_id = $field->getFieldStorageDefinition()->getSetting('powertagging_id');
-    $powertagging_config = PowerTaggingConfig::load($powertagging_id)->getConfig();
+    $powertagging_id = $field->getFieldStorageDefinition()
+      ->getSetting('powertagging_id');
+    $powertagging_config = PowerTaggingConfig::load($powertagging_id)
+      ->getConfig();
     $limits = empty($field->getSetting('limits')) ? $powertagging_config['limits'] : $field->getSetting('limits');
 
     PowerTaggingConfigForm::addLimitsForm($form['limits'], $limits, TRUE);
@@ -233,12 +239,12 @@ class PowerTaggingTagsItem extends FieldItemBase {
     // Show a checkbox for the including in a glossary if the "Smart Glossary"
     // module is installed and enabled.
     if (\Drupal::moduleHandler()->moduleExists('smart_glossary')) {
-      $form['include_in_tag_glossary'] = array(
+      $form['include_in_tag_glossary'] = [
         '#type' => 'checkbox',
         '#title' => t('Include in PowerTagging Tag Glossary'),
         '#description' => t('Show tags of this field in the "PowerTagging Tag Glossary" block (if it is enabled)'),
         '#default_value' => $field->getSetting('include_in_tag_glossary'),
-      );
+      ];
     }
 
     return $form;
@@ -275,14 +281,16 @@ class PowerTaggingTagsItem extends FieldItemBase {
    *   A list of supported fields.
    */
   protected static function getSupportedTaggingFields(FieldDefinitionInterface $field) {
-    $field_definitions = \Drupal::service('entity_field.manager')->getFieldDefinitions($field->getTargetEntityTypeId(), $field->getTargetBundle());
+    $field_definitions = \Drupal::service('entity_field.manager')
+      ->getFieldDefinitions($field->getTargetEntityTypeId(), $field->getTargetBundle());
     $widget_manager = \Drupal::service('plugin.manager.field.widget');
     $supported_field_types = static::getSupportedFieldTypes();
     $supported_fields = [];
 
     switch ($field->getTargetEntityTypeId()) {
       case 'node':
-        $supported_fields['title'] = $field_definitions['title']->getLabel()->render() . '<span class="description">[Text field]</span>';
+        $supported_fields['title'] = $field_definitions['title']->getLabel()
+            ->render() . '<span class="description">[Text field]</span>';
         break;
 
       case 'taxonomy_term':
@@ -305,6 +313,5 @@ class PowerTaggingTagsItem extends FieldItemBase {
 
     return $supported_fields;
   }
-
 
 }

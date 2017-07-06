@@ -6,13 +6,13 @@
 
 namespace Drupal\powertagging\Form;
 
-
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Url;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
 use Drupal\powertagging\Plugin\Field\FieldType\PowerTaggingTagsItem;
+use Drupal\powertagging\PowerTagging;
 
 class PowerTaggingTagContentForm extends FormBase {
 
@@ -20,7 +20,7 @@ class PowerTaggingTagContentForm extends FormBase {
    * {@inheritdoc}
    */
   public function getFormId() {
-    return 'poolparty_tag_content_form';
+    return 'powertagging_tag_content_form';
   }
 
   /**
@@ -67,18 +67,26 @@ class PowerTaggingTagContentForm extends FormBase {
       $form['submit'] = [
         '#type' => 'submit',
         '#value' => t('Start process'),
+        '#attributes' => ['class' => ['button--primary']],
       ];
     }
     else {
       $form['error'] = [
-        '#markup' => '<div class="messages messages--error">' . t('No taggable content types found for PowerTagging configuration "%ptconfname".', ['%ptconfname' => $powertagging_config->getTitle()]) . '</div>',
+        '#markup' => '<div class="messages messages--error">' . t('No taggable content types found for the PowerTagging configuration "%title".', ['%title' => $powertagging_config->getTitle()]) . '</div>',
       ];
     }
 
+    if (\Drupal::request()->query->has('destination')) {
+      $destination = \Drupal::request()->get('destination');
+      $url = Url::fromUri(\Drupal::request()->getSchemeAndHttpHost() . $destination);
+    }
+    else {
+      $url = Url::fromRoute('entity.powertagging.edit_config_form', ['powertagging' => $powertagging_config->id()]);
+    }
     $form['cancel'] = [
       '#type' => 'link',
       '#title' => t('Cancel'),
-      '#url' => Url::fromRoute('entity.powertagging.edit_config_form', ['powertagging' => $powertagging_config->id()]),
+      '#url' => $url,
       '#attributes' => [
         'class' => ['button'],
       ],
@@ -103,8 +111,18 @@ class PowerTaggingTagContentForm extends FormBase {
   public function submitForm(array &$form, FormStateInterface $form_state) {
     /** @var PowerTaggingConfig $powertagging_config */
     $powertagging_config = $form_state->getValue('powertagging_config');
+    $configuration = $powertagging_config->getConfig();
     $entities_per_request = $form_state->getValue('entities_per_request');
     $content_types = $form_state->getValue('content_types');
+
+    // Get the configured project languages.
+    $allowed_langcodes = [];
+    foreach ($configuration['project']['languages'] as $drupal_lang => $pp_lang) {
+      if (!empty($pp_lang)) {
+        $allowed_langcodes[] = $drupal_lang;
+      }
+    }
+
     $start_time = time();
     $total = 0;
     $batch = [
@@ -112,10 +130,7 @@ class PowerTaggingTagContentForm extends FormBase {
       'operations' => [],
       'init_message' => t('Start with the tagging of the entities.'),
       'progress_message' => t('Process @current out of @total.'),
-      'finished' => [
-        '\Drupal\powertagging\PowerTagging',
-        'tagContentBatchFinished',
-      ],
+      'finished' => [$this, 'tagContentBatchFinished'],
     ];
 
     foreach ($content_types as $content_type) {
@@ -149,18 +164,18 @@ class PowerTaggingTagContentForm extends FormBase {
         }
       }
 
-      $configuration = $powertagging_config->getConfig();
       $tag_settings = [
-        'powertagging_id' => $powertagging_config->id(),
-        'powertagging_config' => $powertagging_config,
         'taxonomy_id' => $configuration['project']['taxonomy_id'],
         'concepts_per_extraction' => $settings['limits']['concepts_per_extraction'],
         'concepts_threshold' => $settings['limits']['concepts_threshold'],
         'freeterms_per_extraction' => $settings['limits']['freeterms_per_extraction'],
         'freeterms_threshold' => $settings['limits']['freeterms_threshold'],
+        'entity_language' => '',
+        'allowed_languages' => $allowed_langcodes,
         'fields' => $tag_fields,
         'skip_tagged_content' => $form_state->getValue('skip_tagged_content'),
         'default_tags_field' => (isset($settings['default_tags_field']) ? $settings['default_tags_field'] : ''),
+        'corpus_id' => $configuration['project']['corpus_id'],
       ];
 
       // Get all entities for the given content type.
@@ -190,18 +205,17 @@ class PowerTaggingTagContentForm extends FormBase {
       for ($i = 0; $i < $count; $i += $entities_per_request) {
         $entities = array_slice($entity_ids, $i, $entities_per_request);
         $batch['operations'][] = [
+          [$this, 'tagContentBatchProcess'],
           [
-            '\Drupal\powertagging\PowerTagging',
-            'tagContentBatchProcess',
+            $entities,
+            $entity_type_id,
+            $field_type,
+            $tag_settings,
+            $powertagging_config,
           ],
-          [$entities, $entity_type_id, $field_type, $tag_settings],
         ];
-        $this->batchtest($entities, $entity_type_id, $field_type, $tag_settings);
       }
     }
-
-    echo 'ende';
-    exit();
 
     // Add for each operation some batch info data.
     $batch_info = [
@@ -216,7 +230,25 @@ class PowerTaggingTagContentForm extends FormBase {
     return TRUE;
   }
 
-  private function batchtest($entity_ids, $entity_type_id, $field_type, $tag_settings) {
+  /**
+   * Update the powertagging tags of one powertagging field of a single entity.
+   *
+   * @param array $entity_ids
+   *   A single ID or an array of IDs of entities, depending on the entity type
+   * @param string $entity_type_id
+   *   The entity type ID of the entity (e.g. node, user, ...).
+   * @param string $field_type
+   *   The field type of the powertagging field.
+   * @param array $tag_settings
+   *   An array of settings used during the process of extraction.
+   * @param PowerTaggingConfig $powertagging_config
+   *   A PowerTagging configuration.
+   * @param array $batch_info
+   *   An associative array of information about the batch process.
+   * @param array $context
+   *   The Batch context to transmit data between different calls.
+   */
+  public static function tagContentBatchProcess(array $entity_ids, $entity_type_id, $field_type, array $tag_settings, PowerTaggingConfig $powertagging_config, array $batch_info, &$context) {
     if (!isset($context['results']['processed'])) {
       $context['results']['processed'] = 0;
       $context['results']['tagged'] = 0;
@@ -228,32 +260,39 @@ class PowerTaggingTagContentForm extends FormBase {
       ->getStorage($entity_type_id)
       ->loadMultiple($entity_ids);
 
-    /** @var \Drupal\Core\Entity\ContentEntityBase $entity */
-    // Go through all the entities
-    foreach ($entities as $entity) {
-      $context['results']['processed']++;
+    $powertagging = new PowerTagging($powertagging_config);
+    $powertagging->tagEntities($entities, $field_type, $tag_settings, $context);
 
-      // Return if this entity does not need to be tagged.
-      if ($tag_settings['skip_tagged_content'] && $entity->hasField($field_type) &&
-        $entity->get($field_type)->count()
-      ) {
-        $context['results']['skipped']++;
-        continue;
+    // Show the remaining time as a batch message.
+    $time_string = '';
+    if ($context['results']['processed'] > 0) {
+      $remaining_time = floor((time() - $batch_info['start_time']) / $context['results']['processed'] * ($batch_info['total'] - $context['results']['processed']));
+      if ($remaining_time > 0) {
+        $time_string = (floor($remaining_time / 86400)) . 'd ' . (floor($remaining_time / 3600) % 24) . 'h ' . (floor($remaining_time / 60) % 60) . 'm ' . ($remaining_time % 60) . 's';
       }
-
-      // Build the content.
-      $tag_contents = [];
-      $file_ids = [];
-      foreach ($tag_settings['fields'] as $tag_field_name => $tag_type) {
-        if (!$entity->hasField($tag_field_name) || !$entity->get($tag_field_name)->count()) {
-          continue;
-        }
-
-        echo "$entity_type_id -> $tag_field_name";
-        var_dump($entity->get($tag_field_name)->count());
-
+      else {
+        $time_string = t('Done.');
       }
     }
+
+    $context['message'] = t('Processed entities: %currententities of %totalentities. (Tagged: %taggedentities, Skipped: %skippedentities)', [
+      '%currententities' => $context['results']['processed'],
+      '%taggedentities' => $context['results']['tagged'],
+      '%skippedentities' => $context['results']['skipped'],
+      '%totalentities' => $batch_info['total'],
+    ]);
+    $context['message'] .= '<br />' . t('Remaining time: %remainingtime.', ['%remainingtime' => $time_string]);
+  }
+
+  /**
+   * Batch 'finished' callback used by PowerTagging Bulk Tagging.
+   */
+  public static function tagContentBatchFinished($success, $results, $operations) {
+    drupal_set_message(t('Successfully finished bulk tagging of %totalentities entities. (Tagged: %taggedentities, Skipped: %skippedentities)', [
+      '%totalentities' => $results['processed'],
+      '%taggedentities' => $results['tagged'],
+      '%skippedentities' => $results['skipped'],
+    ]));
   }
 
   /**
