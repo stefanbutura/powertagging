@@ -194,7 +194,7 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
     if (!$powertagging->isNew()) {
       $projects = $connection->getApi('PPX')->getProjects();
       foreach ($projects as $project) {
-        $project_options[$project->uuid] = $project->label;
+        $project_options[$project['uuid']] = $project['label'];
       }
     }
     $form['project_select']['project'] = [
@@ -240,7 +240,7 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
         $projects = $connection->getApi('PPX')->getProjects();
         $project_is_valid = FALSE;
         foreach ($projects as $project) {
-          if ($project->uuid == $form_state->getValue('project')) {
+          if ($project['uuid'] == $form_state->getValue('project')) {
             $project_is_valid = TRUE;
             break;
           }
@@ -354,7 +354,7 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
 
       $projects = $connection->getApi('PPX')->getProjects();
       foreach ($projects as $project) {
-        $project_options[$project->uuid] = $project->label;
+        $project_options[$project['uuid']] = $project['label'];
       }
     }
 

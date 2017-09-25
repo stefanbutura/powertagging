@@ -69,7 +69,7 @@ class PowerTaggingConfigForm extends EntityForm {
     $project = NULL;
     if (!empty($projects)) {
       foreach ($projects as $project) {
-        if ($project->uuid == $powertagging_config->getProjectId()) {
+        if ($project['uuid'] == $powertagging_config->getProjectId()) {
           break;
         }
       }
@@ -79,12 +79,12 @@ class PowerTaggingConfigForm extends EntityForm {
       $form['project_settings']['title'] = [
         '#type' => 'item',
         '#title' => t('Project name'),
-        '#description' => $project->label,
+        '#description' => $project['label'],
       ];
 
       // Language mapping.
       $project_language_options = array();
-      foreach ($project->languages as $project_language) {
+      foreach ($project['languages'] as $project_language) {
         $project_language_options[$project_language] = $project_language;
       }
       $form['project_settings']['languages'] = [
@@ -325,8 +325,8 @@ class PowerTaggingConfigForm extends EntityForm {
     $project_title = '<invalid project selected>';
     $pp_server_projects = $connection->getApi('PPX')->getProjects();
     foreach ($pp_server_projects as $pp_server_project) {
-      if ($pp_server_project->uuid == $powertagging_config->getProjectId()) {
-        $project_title = $pp_server_project->label;
+      if ($pp_server_project['uuid'] == $powertagging_config->getProjectId()) {
+        $project_title = $pp_server_project['label'];
       }
     }
 
