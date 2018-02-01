@@ -39,10 +39,10 @@ class PowerTaggingController extends ControllerBase implements ContainerInjectio
       $suggested_concepts = $powertagging->getResult();
       foreach ($suggested_concepts as $concept) {
         $terms[] = array(
-          'tid' => $concept->tid,
-          'uri' => $concept->uri,
-          'name' => $concept->prefLabel,
-          'value' => $concept->prefLabel,
+          'tid' => $concept['tid'],
+          'uri' => $concept['uri'],
+          'name' => $concept['prefLabel'],
+          'value' => $concept['prefLabel'],
           'type' => 'concept',
         );
       }

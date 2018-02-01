@@ -49,7 +49,12 @@ class PowerTaggingSimilarBlock extends BlockBase {
       // Get the currently viewed entity type and entity ID.
       $entity_type = '';
       $entity_id = '';
-      $params = \Drupal\Core\Url::fromUserInput(\Drupal::service('path.current')->getPath())->getRouteParameters();
+      $current_path = \Drupal\Core\Url::fromUserInput(\Drupal::service('path.current')->getPath());
+      $params = array();
+      if ($current_path->isRouted()) {
+        $params = $current_path->getRouteParameters();
+      }
+
       foreach (array('node', 'user', 'taxonomy_term') as $current_entity_type) {
         if (isset($params[$current_entity_type])) {
           $entity_type = $current_entity_type;

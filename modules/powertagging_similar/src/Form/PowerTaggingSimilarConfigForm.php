@@ -107,7 +107,7 @@ class PowerTaggingSimilarConfigForm extends EntityForm {
           '#type' => 'table',
           '#header' => array(t('Content'), t('Show'), t('Title'), t('Number of items to display'), t('Weight')),
           '#empty' => t('No content type is connected to this PowerTagging configuration.'),
-          '#description' => t('Choose the content you want to display in the widget and in which order.'),
+          '#suffix' => '<div class="description">' . t('Choose the content you want to display in the widget and in which order.') . '</div>',
           '#tabledrag' => array(
             array(
               'action' => 'order',

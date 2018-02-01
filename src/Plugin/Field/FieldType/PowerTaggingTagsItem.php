@@ -290,7 +290,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
     switch ($field->getTargetEntityTypeId()) {
       case 'node':
         $supported_fields['title'] = $field_definitions['title']->getLabel()
-            ->render() . '<span class="description">[Text field]</span>';
+           . '<span class="description">[Text field]</span>';
         break;
 
       case 'taxonomy_term':

@@ -39,13 +39,17 @@ class PowerTaggingTagGlossaryBlock extends BlockBase {
 
     $entity_type = '';
     $entity_id = '';
-    $params = \Drupal\Core\Url::fromUserInput(\Drupal::service('path.current')->getPath())->getRouteParameters();
-    foreach (array('node', 'user', 'taxonomy_term') as $current_entity_type) {
-      if (isset($params[$current_entity_type])) {
-        $entity_type = $current_entity_type;
-        $entity_id = $params[$current_entity_type];
+    $current_path = \Drupal\Core\Url::fromUserInput(\Drupal::service('path.current')->getPath());
+    if ($current_path->isRouted()) {
+      $params = $current_path->getRouteParameters();
+      foreach (array('node', 'user', 'taxonomy_term') as $current_entity_type) {
+        if (isset($params[$current_entity_type])) {
+          $entity_type = $current_entity_type;
+          $entity_id = $params[$current_entity_type];
+        }
       }
     }
+
 
     $block_html = '';
     // One of the supported entities is being displayed at the moment.

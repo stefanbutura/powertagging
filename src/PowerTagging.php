@@ -180,8 +180,8 @@ class PowerTagging {
   /**
    * Extracts the tags from the extraction result set.
    *
-   * @param object $extraction
-   *   The extraction result set.
+   * @param array $extraction
+   *   The extraction result set as an associative array.
    * @param array $settings
    *   The settings for threshold, concepts_per_extraction, ...
    *
@@ -198,12 +198,12 @@ class PowerTagging {
     ];
 
     // Go through the concepts.
-    if (isset($extraction->concepts) && !empty($extraction->concepts)) {
+    if (isset($extraction['concepts']) && !empty($extraction['concepts'])) {
       // Ignore all concepts with the score less than the threshold.
       $threshold = (int) $settings['concepts_threshold']['slider'];
 
-      foreach ($extraction->concepts as $concept) {
-        if ($concept->score >= $threshold) {
+      foreach ($extraction['concepts'] as $concept) {
+        if ($concept['score'] >= $threshold) {
           $concepts[] = $concept;
         }
       }
@@ -215,10 +215,10 @@ class PowerTagging {
       if (!empty($concepts)) {
         foreach ($concepts as $concept) {
           $tags['concepts'][] = [
-            'tid' => isset($concept->tid) ? $concept->tid : 0,
-            'uri' => $concept->uri,
-            'label' => $concept->prefLabel,
-            'score' => $concept->score,
+            'tid' => isset($concept['tid']) ? $concept['tid'] : 0,
+            'uri' => $concept['uri'],
+            'label' => $concept['prefLabel'],
+            'score' => $concept['score'],
             'type' => 'concept',
           ];
         }
@@ -226,10 +226,10 @@ class PowerTagging {
     }
 
     // Go through the free terms.
-    if (isset($extraction->freeTerms) && !empty($extraction->freeTerms)) {
+    if (isset($extraction['freeTerms']) && !empty($extraction['freeTerms'])) {
       // Ignore all free terms with the score less than the threshold.
       $threshold = (int) $settings['freeterms_threshold']['slider'];
-      foreach ($extraction->freeTerms as $free_term) {
+      foreach ($extraction['freeTerms'] as $free_term) {
         if ($free_term->score >= $threshold) {
           $free_terms[] = $free_term;
         }
@@ -241,10 +241,10 @@ class PowerTagging {
       if (!empty($free_terms)) {
         foreach ($free_terms as $free_term) {
           $tags['freeterms'][] = [
-            'tid' => isset($free_term->tid) ? $free_term->tid : 0,
+            'tid' => isset($free_term['tid']) ? $free_term['tid'] : 0,
             'uri' => '',
-            'label' => $free_term->textValue,
-            'score' => $free_term->score,
+            'label' => $free_term['textValue'],
+            'score' => $free_term['score'],
             'type' => 'freeterm',
           ];
         }
@@ -933,7 +933,7 @@ class PowerTagging {
         // Get all concept uris.
         $uris = [];
         foreach ($concepts as $concept) {
-          $uris[] = $concept->uri;
+          $uris[] = $concept['uri'];
         }
 
         // Search for the corresponding tids.
@@ -955,11 +955,11 @@ class PowerTagging {
 
         // Add the tid to each concept if exists.
         foreach ($concepts as &$concept) {
-          if (isset($terms[$concept->uri])) {
-            $concept->tid = $terms[$concept->uri]['tid'];
+          if (isset($terms[$concept['uri']])) {
+            $concept['tid'] = $terms[$concept['uri']]['tid'];
           }
           else {
-            $concept->tid = 0;
+            $concept['tid'] = 0;
           }
         }
         break;
@@ -968,7 +968,7 @@ class PowerTagging {
         // Get all concept uris.
         $labels = [];
         foreach ($concepts as $concept) {
-          $labels[] = $concept->textValue;
+          $labels[] = $concept['textValue'];
         }
 
         // Search for the corresponding tids.
@@ -990,11 +990,11 @@ class PowerTagging {
 
         // Add the tid to each concept if exists.
         foreach ($concepts as &$concept) {
-          if (isset($terms[$concept->textValue])) {
-            $concept->tid = $terms[$concept->textValue]['tid'];
+          if (isset($terms[$concept['textValue']])) {
+            $concept['tid'] = $terms[$concept['textValue']]['tid'];
           }
           else {
-            $concept->tid = 0;
+            $concept['tid'] = 0;
           }
         }
         break;
