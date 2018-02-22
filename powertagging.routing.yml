@@ -34,6 +34,18 @@ entity.powertagging.update_vocabulary:
       powertagging_config:
         type: entity:powertagging
 
+entity.powertagging.refresh_extraction_model:
+  path: '/admin/config/semantic-drupal/powertagging/{powertagging_config}/refresh-extraction-model'
+  defaults:
+    _form: '\Drupal\powertagging\Form\PowerTaggingRefreshExtractionModelForm'
+    _title: 'Refreshing the extraction model for PowerTagging configuration'
+  requirements:
+    _permission: 'administer powertagging'
+  options:
+    parameters:
+      powertagging_config:
+        type: entity:powertagging
+
 powertagging.config:
   path: '/admin/config/semantic-drupal/powertagging/config'
   defaults:

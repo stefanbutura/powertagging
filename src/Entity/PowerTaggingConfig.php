@@ -429,6 +429,7 @@ class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigI
         'freeterms_per_extraction' => 0,
         'freeterms_threshold' => 50,
       ],
+      'last_batch_tagging' => time()
     ];
   }
 

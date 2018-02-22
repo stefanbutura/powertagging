@@ -14,6 +14,7 @@ use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\link\LinkItemInterface;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
+use Drupal\pp_taxonomy_manager\Entity\PPTaxonomyManagerConfig;
 use Drupal\semantic_connector\Entity\SemanticConnectorPPServerConnection;
 use Drupal\taxonomy\Entity\Vocabulary;
 
@@ -202,12 +203,34 @@ class PowerTaggingConfigForm extends EntityForm {
       '#group' => 'settings',
     );
 
+    $taxonomy_manager_configs = array();
+    if (\Drupal::moduleHandler()->moduleExists('pp_taxonomy_manager')) {
+      $taxonomy_manager_configs = PPTaxonomyManagerConfig::loadMultiple();
+    }
+
+    // Check if this taxonomy / project combination is also used by a
+    // taxonomy manager configuration.
+    $vocbulary_update_url = Url::fromRoute('entity.powertagging.update_vocabulary', ['powertagging_config' => $powertagging_config->id()]);
+    /** @var PPTaxonomyManagerConfig $taxonomy_manager_config */
+    foreach ($taxonomy_manager_configs as $taxonomy_manager_config) {
+      if ($powertagging_config->getConnectionId() == $taxonomy_manager_config->getConnectionId()) {
+        $settings = $taxonomy_manager_config->getConfig();
+        foreach ($settings['taxonomies'] as $taxonomy_manager_project_id) {
+          if ($taxonomy_manager_project_id == $powertagging_config->getProjectId()) {
+            $vocbulary_update_url = Url::fromRoute('entity.pp_taxonomy_manager.powertagging_taxonomy_update', array('config' => $taxonomy_manager_config->id(), 'powertagging_config' => $powertagging_config->id()));
+            break;
+          }
+        }
+      }
+    }
+
+
     $operations = [
       [
         'operation' => Link::createFromRoute(t('Tag content'), 'entity.powertagging.tag_content', ['powertagging_config' => $powertagging_config->id()]),
         'description' => t('Select the content types for which the tags should be calculated and linked automatically.'),
       ],[
-        'operation' => Link::createFromRoute(t('Update vocabulary'), 'entity.powertagging.update_vocabulary', ['powertagging_config' => $powertagging_config->id()]),
+        'operation' => Link::fromTextAndUrl(t('Update vocabulary'), $vocbulary_update_url),
         'description' => t('Update all linked tags from the vocabulary with the PoolParty project.'),
       ]
     ];

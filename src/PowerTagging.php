@@ -8,10 +8,13 @@
 namespace Drupal\powertagging;
 
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Link;
+use Drupal\Core\Url;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\file\Entity\File;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
+use Drupal\powertagging\Plugin\Field\FieldType\PowerTaggingTagsItem;
 use Drupal\semantic_connector\Api\SemanticConnectorPPXApi;
 use Drupal\taxonomy\Entity\Term;
 
@@ -21,13 +24,13 @@ use Drupal\taxonomy\Entity\Term;
 class PowerTagging {
 
   protected $config;
-
   protected $config_settings;
-
   /* @param SemanticConnectorPPXApi $PPXApi */
   protected $PPXApi;
-
   protected $result;
+
+  const UPLOAD_MAX_FILE_SIZE = 2; // Unit is in MB.
+  const UPLOAD_MAX_FILE_COUNT = 5;
 
   /**
    * PowerTagging constructor.
@@ -71,8 +74,8 @@ class PowerTagging {
 
     $param = [
       'projectId' => $this->config->getProjectId(),
-      'numberOfConcepts' => (int) $settings['concepts_per_extraction']['slider'],
-      'numberOfTerms' => (int) $settings['freeterms_per_extraction']['slider'],
+      'numberOfConcepts' => (int) $settings['concepts_per_extraction'],
+      'numberOfTerms' => (int) $settings['freeterms_per_extraction'],
       'corpusScoring' => $corpus_id,
     ];
 
@@ -143,7 +146,7 @@ class PowerTagging {
           }
           $tags['suggestion']['concepts'][] = $tag;
           $uris[] = $tag['uri'];
-          if ($settings['concepts_per_extraction']['slider'] <= $count++) {
+          if ($settings['concepts_per_extraction'] <= $count++) {
             break;
           }
         }
@@ -158,7 +161,7 @@ class PowerTagging {
           }
           $tags['suggestion']['freeterms'][] = $tag;
           $labels[] = $tag['label'];
-          if ($settings['freeterms_per_extraction']['slider'] <= $count++) {
+          if ($settings['freeterms_per_extraction'] <= $count++) {
             break;
           }
         }
@@ -200,7 +203,7 @@ class PowerTagging {
     // Go through the concepts.
     if (isset($extraction['concepts']) && !empty($extraction['concepts'])) {
       // Ignore all concepts with the score less than the threshold.
-      $threshold = (int) $settings['concepts_threshold']['slider'];
+      $threshold = (int) $settings['concepts_threshold'];
 
       foreach ($extraction['concepts'] as $concept) {
         if ($concept['score'] >= $threshold) {
@@ -228,9 +231,9 @@ class PowerTagging {
     // Go through the free terms.
     if (isset($extraction['freeTerms']) && !empty($extraction['freeTerms'])) {
       // Ignore all free terms with the score less than the threshold.
-      $threshold = (int) $settings['freeterms_threshold']['slider'];
+      $threshold = (int) $settings['freeterms_threshold'];
       foreach ($extraction['freeTerms'] as $free_term) {
-        if ($free_term->score >= $threshold) {
+        if ($free_term['score'] >= $threshold) {
           $free_terms[] = $free_term;
         }
       }
@@ -281,7 +284,8 @@ class PowerTagging {
    * @param string $field_type
    *   The field type of the powertagging field.
    * @param array $tag_settings
-   *   An array of settings used during the process of extraction.
+   *   An array of settings used during the process of extraction. Use
+   *   PowerTagging::buildTagSettings() to build it.
    * @param array $context
    *   The Batch context to transmit data between different calls.
    */
@@ -299,96 +303,7 @@ class PowerTagging {
         continue;
       }
 
-      // Build the content.
-      $tag_contents = [];
-      $file_ids = [];
-      foreach ($tag_settings['fields'] as $tag_field_name => $tag_type) {
-        if (!$entity->hasField($tag_field_name) ||
-          $entity->get($tag_field_name)->count() == 0
-        ) {
-          continue;
-        }
-
-        foreach ($entity->get($tag_field_name)->getValue() as $value) {
-          switch ($tag_type['module']) {
-            case 'core':
-              $tag_content = trim(strip_tags($value['value']));
-              if (!empty($tag_content)) {
-                $tag_contents[] = $tag_content;
-              }
-              break;
-
-            case 'text':
-              $tag_content = trim(strip_tags($value['value']));
-              if ($tag_type['widget'] == 'text_textarea_with_summary') {
-                $tag_summary = trim(strip_tags($value['summary']));
-                if (!empty($tag_summary) && $tag_summary != $tag_content) {
-                  $tag_contents[] = $tag_summary;
-                }
-              }
-              if (!empty($tag_content)) {
-                $tag_contents[] = $tag_content;
-              }
-              break;
-
-            // TODO: Add core media support.
-            case 'file':
-              $file_ids[] = $value['target_id'];
-              break;
-          }
-        }
-      }
-
-      // Get the concepts for the entity.
-      $tag_settings['entity_language'] = $entity->language()->getId();
-      $this->extract(implode(' ', $tag_contents), $file_ids, $tag_settings);
-      $extraction_result = $this->getResult();
-
-      // Add already existing terms from default tags field if required.
-      if (!empty($tag_settings['default_tags_field']) &&
-        $entity->hasField($tag_settings['default_tags_field']) &&
-        $entity->get($tag_settings['default_tags_field'])->count()
-      ) {
-        $field_values = $entity->get($tag_settings['default_tags_field'])
-          ->getValue();
-        $default_terms_ids = [];
-        foreach ($field_values as $field_value) {
-          $default_terms_ids[] = $field_value['target_id'];
-        }
-
-        $terms = Term::loadMultiple($default_terms_ids);
-        /** @var Term $term */
-        foreach ($terms as $term) {
-          $low_term_name = strtolower($term->getName());
-          $unique = TRUE;
-          foreach ($extraction_result['suggestion']['concepts'] as $concept) {
-            if (strtolower($concept['label']) == $low_term_name) {
-              $unique = FALSE;
-              break;
-            }
-          }
-          if ($unique) {
-            foreach ($extraction_result['suggestion']['freeterms'] as $freeterm) {
-              if (strtolower($freeterm['label']) == $low_term_name) {
-                $unique = FALSE;
-                break;
-              }
-            }
-            if ($unique) {
-              $extraction_result['suggestion']['freeterms'][] = [
-                'tid' => 0,
-                'uri' => '',
-                'label' => $term->getName(),
-                'score' => 100,
-                'type' => 'freeterm',
-              ];
-            }
-          }
-        }
-      }
-
-      // Update the vocabulary.
-      $tags = $this->updateTaxonomyTerms($extraction_result, $tag_settings['taxonomy_id'], $tag_settings['entity_language']);
+      $tags = $this->extractTagsOfEntity($entity, $tag_settings);
 
       // Set the new taxonomy terms and save the entity.
       $entity->set($field_type, $tags);
@@ -396,6 +311,155 @@ class PowerTagging {
 
       $context['results']['tagged']++;
     }
+  }
+
+  /**
+   * Extract the tags of an entity.
+   *
+   * @param \Drupal\Core\Entity\ContentEntityBase $entity
+   *   The entity to extract the tags for.
+   * @param array $tag_settings
+   *   An array of settings used during the process of extraction. Use
+   *   PowerTagging::buildTagSettings() to build it.
+   *
+   * @return int[]
+   *   Array of term IDs of the tags.
+   */
+  public function extractTagsOfEntity($entity, array $tag_settings) {
+    // Build the content.
+    $tag_contents = self::extractEntityContent($entity, $tag_settings['fields']);
+
+    // Get the concepts for the entity.
+    $tag_settings['entity_language'] = $entity->language()->getId();
+    $this->extract(implode(' ', $tag_contents['text']), $tag_contents['file_ids'], $tag_settings);
+    $extraction_result = $this->getResult();
+
+    // Add already existing terms from default tags field if required.
+    if (!empty($tag_settings['default_tags_field']) &&
+      $entity->hasField($tag_settings['default_tags_field']) &&
+      $entity->get($tag_settings['default_tags_field'])->count()
+    ) {
+      $default_tags_info_field = FieldStorageConfig::loadByName($entity->getEntityTypeId(), $tag_settings['default_tags_field']);
+      $keys = array_keys($default_tags_info_field->getColumns());
+      $field_values = $entity->get($tag_settings['default_tags_field'])
+        ->getValue();
+      $default_terms_ids = [];
+      foreach ($field_values as $field_value) {
+        $default_terms_ids[] = $field_value[$keys[0]];
+      }
+
+      $terms = Term::loadMultiple($default_terms_ids);
+      /** @var Term $term */
+      foreach ($terms as $term) {
+        $low_term_name = strtolower($term->getName());
+        $unique = TRUE;
+        foreach ($extraction_result['suggestion']['concepts'] as $concept) {
+          if ($term->hasField('field_uri') && $term->get('field_uri')->count() && $term->get('field_uri')->getString() == $concept['uri']) {
+            $unique = FALSE;
+            break;
+          }
+          elseif (strtolower($concept['label']) == $low_term_name) {
+            $unique = FALSE;
+            break;
+          }
+        }
+        if ($unique) {
+          foreach ($extraction_result['suggestion']['freeterms'] as $freeterm) {
+            if (strtolower($freeterm['label']) == $low_term_name) {
+              $unique = FALSE;
+              break;
+            }
+          }
+          if ($unique) {
+            if ($term->hasField('field_uri') && $term->get('field_uri')->count()) {
+              $extraction_result['suggestion']['concepts'][] = array(
+                'tid' => 0,
+                'uri' => $term->get('field_uri')->getString(),
+                'label' => $term->getName(),
+                'score' => 100,
+                'type' => 'concept',
+              );
+            }
+            else {
+              $extraction_result['suggestion']['freeterms'][] = array(
+                'tid' => 0,
+                'uri' => '',
+                'label' => $term->getName(),
+                'score' => 100,
+                'type' => 'freeterm',
+              );
+            }
+          }
+        }
+      }
+    }
+
+    // Update the vocabulary.
+    return $this->updateTaxonomyTerms($extraction_result, $tag_settings['taxonomy_id'], $tag_settings['entity_language']);
+  }
+
+  /**
+   * Extract the content of an entity.
+   *
+   * @param \Drupal\Core\Entity\ContentEntityBase $entity
+   *   The entity to extract the tags for.
+   * @param array $fields
+   *   An associative array of tag fields by field ID, containing keys "module"
+   *   and "type"
+   *
+   * @return array
+   *   An associative array of the extracted content containing following keys:
+   *   - text (string) --> The extracted text from the entity.
+   *   - file_ids (array) --> An array of file IDs that were extracted.
+   */
+  public static function extractEntityContent($entity, $fields) {
+    $entity_content = array(
+      'text' => '',
+      'file_ids' => array(),
+    );
+    $text_parts = [];
+    foreach ($fields as $tag_field_name => $tag_type) {
+      if (!$entity->hasField($tag_field_name) ||
+        $entity->get($tag_field_name)->count() == 0
+      ) {
+        continue;
+      }
+
+      foreach ($entity->get($tag_field_name)->getValue() as $value) {
+        switch ($tag_type['module']) {
+          case 'core':
+            $tag_content = trim(strip_tags($value['value']));
+            if (!empty($tag_content)) {
+              $text_parts[] = $tag_content;
+            }
+            break;
+
+          case 'text':
+            $tag_content = trim(strip_tags($value['value']));
+            if ($tag_type['widget'] == 'text_textarea_with_summary') {
+              $tag_summary = trim(strip_tags($value['summary']));
+              if (!empty($tag_summary) && $tag_summary != $tag_content) {
+                $text_parts[] = $tag_summary;
+              }
+            }
+            if (!empty($tag_content)) {
+              $text_parts[] = $tag_content;
+            }
+            break;
+
+          // TODO: Add core media support.
+          case 'file':
+            $entity_content['file_ids'][] = $value['target_id'];
+            break;
+        }
+      }
+    }
+
+    if (!empty($text_parts)) {
+      $entity_content['text'] = implode(' ', $text_parts);
+    }
+
+    return $entity_content;
   }
 
   /**
@@ -744,6 +808,112 @@ class PowerTagging {
   }
 
   /**
+   * Check if any extraction model has to be refreshed.
+   *
+   * @param PowerTaggingConfig $powertagging_config
+   *   Optional; A specific PowerTagging configuration to check for PoolParty
+   *   updates. If none is given, all PowerTagging configurations get checked.
+   * @param bool $add_config_info
+   *   If set to TRUE, information about what PowerTagging configuration uses the
+   *   the extraction model will be added to the notification.
+   *
+   * @return string[]
+   *   Array of notification strings.
+   */
+  public static function checkExtractionModels($powertagging_config = NULL, $add_config_info = TRUE) {
+    $notifications = array();
+
+    if (!is_null($powertagging_config)) {
+      $configs = array($powertagging_config);
+    }
+    else {
+      $configs = PowerTaggingConfig::loadMultiple();
+    }
+
+    /** @var PowerTaggingConfig $config */
+    foreach ($configs as $config) {
+      /** @var \Drupal\semantic_connector\Api\SemanticConnectorPPTApi $ppt_api */
+      $ppt_api = $config->getConnection()
+        ->getApi('PPT');
+
+      $extraction_model_info = $ppt_api->getExtractionModelInfo($config->getProjectId());
+      if (is_array($extraction_model_info) && !$extraction_model_info['upToDate']) {
+        // Get the project label.
+        $connection_config = $config->getConnection()->getConfig();
+        $project_label = t('Project label not found');
+        if (isset($connection_config['projects'])) {
+          foreach ($connection_config['projects'] as $project) {
+            if ($project['id'] == $config->getProjectId()) {
+              $project_label = $project['title'];
+              break;
+            }
+          }
+        }
+
+        // Add the notification.
+        $notifications[] = t('The extraction model for the PoolParty project "%project" is outdated', array('%project' => $project_label)) . ($add_config_info ? ' ' . t('(used in PowerTagging configuration "%powertaggingtitle")', array('%powertaggingtitle' => $config->getTitle())) : '') . '. ' . Link::fromTextAndUrl('refresh it now', Url::fromRoute('entity.powertagging.refresh_extraction_model', array('powertagging_config' => $config->id())))->toString();
+      }
+    }
+
+    return $notifications;
+  }
+
+  /**
+   * Check if any content has to be retagged (after an extraction mode update).
+   *
+   * @param PowerTaggingConfig $powertagging_config
+   *   Optional; A specific PowerTagging configuration to check for required
+   *   retagging. If none is given, all PowerTagging configurations get checked.
+   *
+   * @return string[]
+   *   Array of notification strings.
+   */
+  public static function checkRetaggingRequired($powertagging_config = NULL) {
+    $notifications = array();
+
+    if (!is_null($powertagging_config)) {
+      $configs = array($powertagging_config);
+    }
+    else {
+      $configs = PowerTaggingConfig::loadMultiple();
+    }
+
+    /** @var PowerTaggingConfig $config */
+    foreach ($configs as $config) {
+      /** @var \Drupal\semantic_connector\Api\SemanticConnectorPPTApi $ppt_api */
+      $ppt_api = $config->getConnection()
+        ->getApi('PPT');
+
+      $settings = $config->getConfig();
+
+      $extraction_model_info = $ppt_api->getExtractionModelInfo($config->getProjectId());
+      // The extraction model was refreshed recently.
+      if (is_array($extraction_model_info) && strtotime($extraction_model_info['lastBuildTime']) > $settings['last_batch_tagging']) {
+        // Check if the PowerTagging configuration is already connected with content / fields.
+        $fields = $powertagging_config->getFields();
+        if (!empty($fields)) {
+          // Get the project label.
+          $connection_config = $config->getConnection()->getConfig();
+          $project_label = t('Project label not found');
+          if (isset($connection_config['projects'])) {
+            foreach ($connection_config['projects'] as $project) {
+              if ($project['id'] == $config->getProjectId()) {
+                $project_label = $project['title'];
+                break;
+              }
+            }
+          }
+
+          // Add the notification.
+          $notifications[] = t('The extraction model for the PoolParty project "%project" was updated, your content can now be retagged with PowerTagging configuration "%powertaggingtitle".', array('%project' => $project_label, '%powertaggingtitle' => $config->getTitle())) . ' ' . Link::fromTextAndUrl('retag content', Url::fromRoute('entity.powertagging.tag_content', array('powertagging_config' => $config->id())))->toString();
+        }
+      }
+    }
+
+    return $notifications;
+  }
+
+  /**
    * Get the list of IDs of the top terms from a vocabulary.
    *
    * @param string $vid
@@ -907,8 +1077,138 @@ class PowerTagging {
         $content_type_options[$field_instance->getTargetEntityTypeId() . ' ' . $field_instance->getTargetBundle() . ' ' . $field_instance->getName()] = $option_title;
       }
     }
+    ksort($content_type_options);
 
     return $content_type_options;
+  }
+
+  /**
+   * Build the settings required for the tagging process.
+   *
+   * @param array $field_info
+   *   An associative array describing the fields containing following keys:
+   *   - entity_type_id => The ID of the entity type,
+   *   - bundle => The ID of the bundle,
+   *   - field_type => The field type,
+   * @param array $settings
+   *   Optional: additional associative array containing settings to add to the
+   *   returned array of tag settings.
+   *
+   * @return array
+   *   An associative array of tag settings containing following keys:
+   *   - powertagging_id (int) --> The ID of the PowerTagging configuration.
+   *   - powertagging_config (object) --> The PowerTagging configuration.
+   *   - taxonomy_id (int) --> The vocabulary ID used for the tagging.
+   *   - concepts_per_extraction (int) --> The number of concepts per extraction.
+   *   - concepts_threshold (int) --> The threshold of concepts.
+   *   - freeterms_per_extraction (int) --> The number of treeterms per extraction.
+   *   - freeterms_threshold (int) --> The threshold of freeterms.
+   *   - fields (array) --> An associative array of tag fields by field ID,
+   *     containing keys "module" and "type".
+   *   - skip_tagged_content (bool) --> Whether to skip already tagged content or
+   *     tag it anyway.
+   *   - default_tags_field (array) --> The field names of fields that should be
+   *     used as the default value for the tags.
+   *   - ... anything added by the $settings parameter.
+   */
+  function buildTagSettings(array $field_info, array $settings = []) {
+    $config_settings = $this->config->getConfig();
+
+    // Get the configured project languages.
+    $allowed_langcodes = [];
+    foreach ($config_settings['project']['languages'] as $drupal_lang => $pp_lang) {
+      if (!empty($pp_lang)) {
+        $allowed_langcodes[] = $drupal_lang;
+      }
+    }
+
+    $field_settings = $this->config->getFieldSettings($field_info);
+
+    $tag_fields = [];
+    foreach ($field_settings['fields'] as $tag_field_type) {
+      if ($tag_field_type && !isset($tag_fields[$tag_field_type])) {
+        $info = self::getInfoForTaggingField([
+          'entity_type_id' => $field_info['entity_type_id'],
+          'bundle' => $field_info['bundle'],
+          'field_type' => $tag_field_type,
+        ]);
+        if (!empty($info)) {
+          $tag_fields[$tag_field_type] = $info;
+        }
+      }
+    }
+
+    // Build the tag settings array.
+    $tag_settings = array(
+      'powertagging_id' => $this->config->id(),
+      'powertagging_config' => $this->config,
+      'taxonomy_id' => $config_settings['project']['taxonomy_id'],
+      'concepts_per_extraction' => $field_settings['limits']['concepts_per_extraction'],
+      'concepts_threshold' => $field_settings['limits']['concepts_threshold'],
+      'freeterms_per_extraction' => $field_settings['limits']['freeterms_per_extraction'],
+      'freeterms_threshold' => $field_settings['limits']['freeterms_threshold'],
+      'entity_language' => '',
+      'allowed_languages' => $allowed_langcodes,
+      'fields' => $tag_fields,
+      'skip_tagged_content' => (isset($settings['skip_tagged_content']) ? $settings['skip_tagged_content'] : FALSE),
+      'default_tags_field' => (isset($field_settings['settings']['default_tags_field']) ? $field_settings['settings']['default_tags_field'] : ''),
+      'max_file_size' => (isset($field_settings['settings']['file_upload']['max_file_size']) ? $field_settings['settings']['file_upload']['max_file_size'] : (self::UPLOAD_MAX_FILE_SIZE * 1048576)),
+      'max_file_count' => (isset($field_settings['settings']['file_upload']['max_file_count']) ? $field_settings['settings']['file_upload']['max_file_count'] : self::UPLOAD_MAX_FILE_COUNT),
+    );
+
+    // Merge in the additional settings.
+    $tag_settings = array_merge($tag_settings, $settings);
+
+    return $tag_settings;
+  }
+
+  /**
+   * Gets the module and widget for a given field.
+   *
+   * @param array $field
+   *   The field array with entity type ID, bundle and field type.
+   *
+   * @return array
+   *   Module and widget info for a field.
+   */
+  public static function getInfoForTaggingField(array $field) {
+    if ($field['entity_type_id'] == 'node' && $field['field_type'] == 'title') {
+      return [
+        'module' => 'core',
+        'widget' => 'string_textfield',
+      ];
+    }
+
+    if ($field['entity_type_id'] == 'taxonomy_term' && $field['field_type'] == 'name') {
+      return [
+        'module' => 'core',
+        'widget' => 'string_textfield',
+      ];
+    }
+
+    if ($field['entity_type_id'] == 'taxonomy_term' && $field['field_type'] == 'description') {
+      return [
+        'module' => 'text',
+        'widget' => 'text_textarea',
+      ];
+    }
+
+    /** @var \Drupal\Core\Entity\EntityFieldManager $entityFieldManager */
+    $entityFieldManager = \Drupal::service('entity_field.manager');
+    /** @var FieldConfig $field_definition */
+    $field_definition = $entityFieldManager->getFieldDefinitions($field['entity_type_id'], $field['bundle'])[$field['field_type']];
+
+    if (!$field_definition instanceof FieldConfig) {
+      return [];
+    }
+
+    $field_storage = $field_definition->getFieldStorageDefinition();
+    $supported_field_types = PowerTaggingTagsItem::getSupportedFieldTypes();
+
+    return [
+      'module' => $field_storage->getTypeProvider(),
+      'widget' => $supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()],
+    ];
   }
 
   /**

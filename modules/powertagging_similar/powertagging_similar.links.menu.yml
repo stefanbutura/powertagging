@@ -3,3 +3,4 @@ powertagging_similar.overview:
   route_name: entity.powertagging_similar.collection
   description: 'Manage PowerTagging Similar Content widgets.'
   parent: powertagging.overview
+  weight: 2

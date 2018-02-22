@@ -13,6 +13,8 @@ use Drupal\field\Entity\FieldConfig;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
 use Drupal\powertagging\Plugin\Field\FieldType\PowerTaggingTagsItem;
 use Drupal\powertagging\PowerTagging;
+use Drupal\semantic_connector\SemanticConnector;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 
 class PowerTaggingTagContentForm extends FormBase {
 
@@ -32,6 +34,17 @@ class PowerTaggingTagContentForm extends FormBase {
   public function buildForm(array $form, FormStateInterface $form_state, PowerTaggingConfig $powertagging_config = NULL) {
     $fields = $powertagging_config->getFields();
     if (!empty($fields)) {
+      // Check if the extraction model is up to date.
+      $extraction_model_notifications = PowerTagging::checkExtractionModels($powertagging_config, FALSE);
+      if (!empty($extraction_model_notifications)) {
+        // Fixed values for the formatter.
+        $form['extraction_model_refresh_required'] = array(
+          '#type' => 'markup',
+          '#markup' => '<div class="messages warning">' . $extraction_model_notifications[0] . '</div>',
+        );
+      }
+
+      // Fixed values for the formatter.
       $form['powertagging_config'] = [
         '#type' => 'value',
         '#value' => $powertagging_config,
@@ -69,11 +82,16 @@ class PowerTaggingTagContentForm extends FormBase {
         '#value' => t('Start process'),
         '#attributes' => ['class' => ['button--primary']],
       ];
+      $form['cancel'] = array(
+        '#type' => 'link',
+        '#title' => t('Cancel'),
+        '#url' => Url::fromRoute('entity.powertagging.edit_config_form', ['powertagging' => $powertagging_config->id()]),
+        '#suffix' => '</div>',
+      );
     }
     else {
-      $form['error'] = [
-        '#markup' => '<div class="messages messages--error">' . t('No taggable content types found for the PowerTagging configuration "%title".', ['%title' => $powertagging_config->getTitle()]) . '</div>',
-      ];
+      drupal_set_message(t('No taggable content types found for PowerTagging configuration "%ptconfname".', array('%ptconfname' => $powertagging_config->getTitle())), 'error');
+      return new RedirectResponse(Url::fromRoute('entity.powertagging.edit_config_form', ['powertagging' => $powertagging_config->id()])->toString());
     }
 
     if (\Drupal::request()->query->has('destination')) {
@@ -115,14 +133,6 @@ class PowerTaggingTagContentForm extends FormBase {
     $entities_per_request = $form_state->getValue('entities_per_request');
     $content_types = $form_state->getValue('content_types');
 
-    // Get the configured project languages.
-    $allowed_langcodes = [];
-    foreach ($configuration['project']['languages'] as $drupal_lang => $pp_lang) {
-      if (!empty($pp_lang)) {
-        $allowed_langcodes[] = $drupal_lang;
-      }
-    }
-
     $start_time = time();
     $total = 0;
     $batch = [
@@ -145,38 +155,17 @@ class PowerTaggingTagContentForm extends FormBase {
         continue;
       }
 
-      $settings = $powertagging_config->getFieldSettings([
+      $field_info = [
         'entity_type_id' => $entity_type_id,
         'bundle' => $bundle,
         'field_type' => $field_type,
-      ]);
-      $tag_fields = [];
-      foreach ($settings['fields'] as $tag_field_type) {
-        if ($tag_field_type && !isset($tag_fields[$tag_field_type])) {
-          $info = $this->getInfoForTaggingField([
-            'entity_type_id' => $entity_type_id,
-            'bundle' => $bundle,
-            'field_type' => $tag_field_type,
-          ]);
-          if (!empty($info)) {
-            $tag_fields[$tag_field_type] = $info;
-          }
-        }
-      }
-
-      $tag_settings = [
-        'taxonomy_id' => $configuration['project']['taxonomy_id'],
-        'concepts_per_extraction' => $settings['limits']['concepts_per_extraction'],
-        'concepts_threshold' => $settings['limits']['concepts_threshold'],
-        'freeterms_per_extraction' => $settings['limits']['freeterms_per_extraction'],
-        'freeterms_threshold' => $settings['limits']['freeterms_threshold'],
-        'entity_language' => '',
-        'allowed_languages' => $allowed_langcodes,
-        'fields' => $tag_fields,
-        'skip_tagged_content' => $form_state->getValue('skip_tagged_content'),
-        'default_tags_field' => (isset($settings['default_tags_field']) ? $settings['default_tags_field'] : ''),
-        'corpus_id' => $configuration['project']['corpus_id'],
       ];
+      $powertagging = new PowerTagging($powertagging_config);
+      $tag_settings = $powertagging->buildTagSettings($field_info, array('skip_tagged_content' => $form_state->getValue('skip_tagged_content')));
+
+      // Remove PowerTagging Config object from the settings for more memory
+      // resources during the batch process.
+      unset($tag_settings['powertagging_config']);
 
       // Get all entities for the given content type.
       $entity_ids = [];
@@ -211,7 +200,6 @@ class PowerTaggingTagContentForm extends FormBase {
             $entity_type_id,
             $field_type,
             $tag_settings,
-            $powertagging_config,
           ],
         ];
       }
@@ -241,19 +229,22 @@ class PowerTaggingTagContentForm extends FormBase {
    *   The field type of the powertagging field.
    * @param array $tag_settings
    *   An array of settings used during the process of extraction.
-   * @param PowerTaggingConfig $powertagging_config
-   *   A PowerTagging configuration.
    * @param array $batch_info
    *   An associative array of information about the batch process.
    * @param array $context
    *   The Batch context to transmit data between different calls.
    */
-  public static function tagContentBatchProcess(array $entity_ids, $entity_type_id, $field_type, array $tag_settings, PowerTaggingConfig $powertagging_config, array $batch_info, &$context) {
+  public static function tagContentBatchProcess(array $entity_ids, $entity_type_id, $field_type, array $tag_settings, array $batch_info, &$context) {
     if (!isset($context['results']['processed'])) {
       $context['results']['processed'] = 0;
       $context['results']['tagged'] = 0;
       $context['results']['skipped'] = 0;
+      $context['results']['powertagging_id'] = $tag_settings['powertagging_id'];
     }
+
+    // Add the PowerTagging configuration object to the $tag_settings.
+    $powertagging_config = PowerTaggingConfig::load($tag_settings['powertagging_id']);
+    $tag_settings['powertagging_config'] = $powertagging_config;
 
     // Load the entities.
     $entities = \Drupal::entityTypeManager()
@@ -293,54 +284,24 @@ class PowerTaggingTagContentForm extends FormBase {
       '%taggedentities' => $results['tagged'],
       '%skippedentities' => $results['skipped'],
     ]));
-  }
 
-  /**
-   * Gets the module and widget for a given field.
-   *
-   * @param array $field
-   *   The field array with entity type ID, bundle and field type.
-   *
-   * @return array
-   *   Module and widget info for a field.
-   */
-  protected function getInfoForTaggingField(array $field) {
-    if ($field['entity_type_id'] == 'node' && $field['field_type'] == 'title') {
-      return [
-        'module' => 'core',
-        'widget' => 'string_textfield',
-      ];
+    if (isset($results['powertagging_id'])) {
+      // Update the time of the most recent batch.
+      $powertagging_config = PowerTaggingConfig::load($results['powertagging_id']);
+      $settings = $powertagging_config->getConfig();
+      $settings['last_batch_tagging'] = time();
+      $powertagging_config->setConfig($settings);
+      $powertagging_config->save();
+
+      // If there are any global notifications and they could be caused by a
+      // missing retagging action, refresh the notifications.
+      $notifications = \Drupal::config('semantic_connector.settings')->get('global_notifications');
+      if (!empty($notifications)) {
+        $notification_config = SemanticConnector::getGlobalNotificationConfig();
+        if (isset($notification_config['actions']['powertagging_retag_content']) && $notification_config['actions']['powertagging_retag_content']) {
+          SemanticConnector::checkGlobalNotifications(TRUE);
+        }
+      }
     }
-
-    if ($field['entity_type_id'] == 'taxonomy_term' && $field['field_type'] == 'name') {
-      return [
-        'module' => 'core',
-        'widget' => 'string_textfield',
-      ];
-    }
-
-    if ($field['entity_type_id'] == 'taxonomy_term' && $field['field_type'] == 'description') {
-      return [
-        'module' => 'text',
-        'widget' => 'text_textarea',
-      ];
-    }
-
-    /** @var \Drupal\Core\Entity\EntityFieldManager $entityFieldManager */
-    $entityFieldManager = \Drupal::service('entity_field.manager');
-    /** @var FieldConfig $field_definition */
-    $field_definition = $entityFieldManager->getFieldDefinitions($field['entity_type_id'], $field['bundle'])[$field['field_type']];
-
-    if (!$field_definition instanceof FieldConfig) {
-      return [];
-    }
-
-    $field_storage = $field_definition->getFieldStorageDefinition();
-    $supported_field_types = PowerTaggingTagsItem::getSupportedFieldTypes();
-
-    return [
-      'module' => $field_storage->getTypeProvider(),
-      'widget' => $supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()],
-    ];
   }
 }

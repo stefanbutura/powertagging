@@ -28,22 +28,25 @@
               });
               $(this).val('');
             }
-          }).keyup(function (e) {
-            if (e.keyCode === 13) {
-              var field_value = jQuery.trim($(this).val());
-              if (field_value.length > 0) {
-                PTContainers.resultArea(pt_field_id).addTag({
-                  tid: 0,
-                  uri: '',
-                  label: field_value,
-                  type: "freeterm",
-                  score: 100
-                });
-                $(this).autocomplete("close");
-                $(this).val("");
-              }
-            }
           });
+          if (settings.settings.custom_freeterms) {
+            $(this).keyup(function (e) {
+              if (e.keyCode === 13) {
+                var field_value = jQuery.trim($(this).val());
+                if (field_value.length > 0) {
+                  PTContainers.resultArea(pt_field_id).addTag({
+                    tid: 0,
+                    uri: '',
+                    label: field_value,
+                    type: "freeterm",
+                    score: 100
+                  });
+                  $(this).autocomplete("close");
+                  $(this).val("");
+                }
+              }
+            });
+          }
         }
       });
 

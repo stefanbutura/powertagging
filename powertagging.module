@@ -56,3 +56,64 @@ function powertagging_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $f
     }
   }
 }
+
+/**
+ * Implements hook_entity_presave().
+ *
+ * @param Drupal\Core\Entity\ContentEntityBase $entity
+ */
+function powertagging_entity_presave($entity) {
+  // One of the supported entities is being created at the moment.
+  if ($entity->isNew() && in_array($entity->getEntityTypeId(), array('node', 'user', 'taxonomy_term'))) {
+    $bundle = $entity->bundle();
+
+    $field_definitions = \Drupal::service('entity_field.manager')->getFieldDefinitions($entity->getEntityTypeId(), $bundle);
+    /** @var \Drupal\field\Entity\FieldConfig $field_definition */
+    foreach ($field_definitions as $field_definition) {
+      $field_settings = $field_definition->getSettings();
+      $field_name = $field_definition->getName();
+      // It is a PowerTagging field with automatic tagging activated.
+      if ($field_definition->getType() == 'powertagging_tags' && isset($field_settings['automatically_tag_new_entities']) && $field_settings['automatically_tag_new_entities']) {
+        // Only go on if the entity doesn't have values for that field yet.
+        if (!$entity->hasField($field_name) || !$entity->get($field_name)->count()) {
+          // Build the tag settings.
+          $powertagging_config = \Drupal\powertagging\Entity\PowerTaggingConfig::load($field_definition->getFieldStorageDefinition()->getSetting('powertagging_id'));
+          $powertagging = new \Drupal\powertagging\PowerTagging($powertagging_config);
+          $tag_settings = $powertagging->buildTagSettings([
+            'entity_type_id' => $entity->getEntityTypeId(),
+            'bundle' => $bundle,
+            'field_type' => $field_name,
+          ]);
+
+          // Extract the tags.
+          $tids = $powertagging->extractTagsOfEntity($entity, $tag_settings);
+
+          // Update the field value.
+          $entity->set($field_name, $tids);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_semantic_connector_global_notification_actions().
+ */
+function powertagging_semantic_connector_global_notification_actions() {
+  return array(
+    array(
+      'id' => 'powertagging_refresh_extraction_model',
+      'title' => t('Required extraction model updates'),
+      'description' => t("PowerTagging with the latest state of the PoolParty thesaurus is only possible if the extraction model is up to date."),
+      'default_value' => TRUE,
+      'callback' => ['Drupal\powertagging\PowerTagging', 'checkExtractionModels'],
+    ),
+    array(
+      'id' => 'powertagging_retag_content',
+      'title' => t('Required retagging of content'),
+      'description' => t("After the extraction model was refreshed, content has to be retagged in order to tagged with the most up to date concepts."),
+      'default_value' => TRUE,
+      'callback' => ['Drupal\powertagging\PowerTagging', 'checkRetaggingRequired'],
+    ),
+  );
+}

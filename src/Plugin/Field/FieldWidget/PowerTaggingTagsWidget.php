@@ -12,6 +12,7 @@ use Drupal\Core\Field\WidgetBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Link;
 use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
 use Drupal\powertagging\Plugin\Field\FieldType\PowerTaggingTagsItem;
 use Drupal\powertagging\PowerTagging;
@@ -56,33 +57,46 @@ class PowerTaggingTagsWidget extends WidgetBase {
 
     // Get the selected tag IDs.
     $tag_ids = [];
+    /** @var PowerTaggingTagsItem $item */
     foreach ($items as $item) {
-      if ($item->target_id !== NULL) {
-        $tag_ids[] = $item->target_id . '#' . $item->score;
+      $item_value = $item->getValue();
+      if ($item_value['target_id'] !== NULL) {
+        $tag_ids[] = $item_value['target_id'] . '#' . $item_value['score'];
       }
     }
+
     $tag_string = implode(',', $tag_ids);
 
     // Get the default tags if required.
     $field_settings = $this->getFieldSettings();
     $default_terms = [];
     if (empty($tag_ids) && !empty($field_settings['default_tags_field'])) {
+      $tag_entity = $items->getEntity();
       /** @var \Drupal\Core\Field\EntityReferenceFieldItemList $tagfield_items */
-      $tagfield_items = $items->getEntity()->{$field_settings['default_tags_field']};
+      $tagfield_items = $tag_entity->{$field_settings['default_tags_field']};
       if ($tagfield_items->count()) {
+        $default_tags_info_field = FieldStorageConfig::loadByName($tag_entity->getEntityTypeId(), $field_settings['default_tags_field']);
+        $keys = array_keys($default_tags_info_field->getColumns());
+
         $default_tag_ids = [];
         /** @var \Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem $item */
         foreach ($tagfield_items as $item) {
-          if (($target_id = $item->getValue()['target_id']) !== NULL) {
+          if (($target_id = $item->getValue()[$keys[0]]) !== NULL) {
             $default_tag_ids[] = $target_id;
           }
         }
         $terms = Term::loadMultiple($default_tag_ids);
         /** @var Term $term */
         foreach ($terms as $term) {
-          $default_terms[] = $term->getName() . '#100';
+          $default_terms[] = $term->getName();
+          if ($term->hasField('field_uri') && $term->get('field_uri')->count()) {
+            $default_terms[] = $term->getName() . '|' . $term->get('field_uri')->getString();
+          }
+          else {
+            $default_terms[] = $term->getName() . '|';
+          }
         }
-        $tag_string = implode('|,', $default_terms) . '|';
+        $tag_string = implode(',', $default_terms);
       }
     }
 
@@ -351,6 +365,7 @@ class PowerTaggingTagsWidget extends WidgetBase {
         'concepts_threshold' => $limits['concepts_threshold'],
         'freeterms_per_extraction' => $limits['freeterms_per_extraction'],
         'freeterms_threshold' => $limits['freeterms_threshold'],
+        'custom_freeterms' => !is_null($field->getSetting('custom_freeterms')) ? $field->getSetting('custom_freeterms') : TRUE,
         'entity_language' => $langcode,
         'allowed_languages' => $allowed_langcodes,
         'corpus_id' => $powertagging_config['project']['corpus_id'],

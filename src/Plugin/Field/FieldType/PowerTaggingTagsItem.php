@@ -172,6 +172,8 @@ class PowerTaggingTagsItem extends FieldItemBase {
   public static function defaultFieldSettings() {
     return [
         'include_in_tag_glossary' => FALSE,
+        'automatically_tag_new_entities' => FALSE,
+        'custom_freeterms' => TRUE,
         'fields' => [],
         'default_tags_field' => '',
         'limits' => [],
@@ -211,7 +213,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
     }
 
     // Show the fields that can be used for tagging.
-    $options = $this->getSupportedTaggingFields($field);
+    $options = $this->getSupportedTaggingFields($field->getTargetEntityTypeId(), $field->getTargetBundle());
     $form['fields'] = [
       '#type' => 'checkboxes',
       '#title' => t('Fields that can be used for tagging'),
@@ -235,6 +237,17 @@ class PowerTaggingTagsItem extends FieldItemBase {
     $limits = empty($field->getSetting('limits')) ? $powertagging_config['limits'] : $field->getSetting('limits');
 
     PowerTaggingConfigForm::addLimitsForm($form['limits'], $limits, TRUE);
+    foreach (array('concepts', 'freeterms') as $concept_type) {
+      $form['limits'][$concept_type]['#description'] .= '<br />' . t('Note: These settings override the global settings defined in the connected PowerTagging configuration.');
+    }
+
+    $form['limits']['freeterms']['custom_freeterms'] = array(
+      '#type' => 'checkbox',
+      '#title' => 'Allow users to add custom free terms',
+      '#description' => 'If this options is enabled users can add custom freeterms by writing text in the search-box of the PowerTagging widget and clicking the enter key.',
+      '#default_value' => $field->getSetting('custom_freeterms'),
+      '#parents' => array('settings', 'custom_freeterms'),
+    );
 
     // Show a checkbox for the including in a glossary if the "Smart Glossary"
     // module is installed and enabled.
@@ -246,6 +259,14 @@ class PowerTaggingTagsItem extends FieldItemBase {
         '#default_value' => $field->getSetting('include_in_tag_glossary'),
       ];
     }
+
+    $form['automatically_tag_new_entities'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Automatically tag new entities'),
+      '#description' => t('When entities get created and don\'t have values for this field yet, they will be tagged automatically.'),
+      '#default_value' => $field->getSetting('automatically_tag_new_entities'),
+      '#empty_value' => '',
+    );
 
     return $form;
   }
@@ -265,6 +286,8 @@ class PowerTaggingTagsItem extends FieldItemBase {
     }
     return [
       'include_in_tag_glossary' => $settings['include_in_tag_glossary'],
+      'automatically_tag_new_entities' => $settings['automatically_tag_new_entities'],
+      'custom_freeterms' => $settings['custom_freeterms'],
       'fields' => $settings['fields'],
       'default_tags_field' => $settings['default_tags_field'],
       'limits' => $limits,
@@ -274,20 +297,22 @@ class PowerTaggingTagsItem extends FieldItemBase {
   /**
    * Get the the fields that are supported for the tagging.
    *
-   * @param FieldDefinitionInterface $field
-   *   The field config object.
+   * @param string $entity_type
+   *   The entity type to check.
+   * @param string $bundle
+   *   The bundle to check.
    *
    * @return array
    *   A list of supported fields.
    */
-  protected static function getSupportedTaggingFields(FieldDefinitionInterface $field) {
+  public static function getSupportedTaggingFields($entity_type, $bundle) {
     $field_definitions = \Drupal::service('entity_field.manager')
-      ->getFieldDefinitions($field->getTargetEntityTypeId(), $field->getTargetBundle());
+      ->getFieldDefinitions($entity_type, $bundle);
     $widget_manager = \Drupal::service('plugin.manager.field.widget');
     $supported_field_types = static::getSupportedFieldTypes();
     $supported_fields = [];
 
-    switch ($field->getTargetEntityTypeId()) {
+    switch ($entity_type) {
       case 'node':
         $supported_fields['title'] = $field_definitions['title']->getLabel()
            . '<span class="description">[Text field]</span>';
