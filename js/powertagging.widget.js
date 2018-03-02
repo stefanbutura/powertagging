@@ -2,6 +2,14 @@
   Drupal.behaviors.powertagging_widget = {
     attach: function (context) {
 
+      // Show/Hide additional fields if a checkbox is enabled/disabled
+      $("#field-config-edit-form").bind("state:visible", function(e) {
+        if(e.trigger) {
+          $(e.target).closest(".form-wrapper")[e.value ? "slideDown" : "slideUp"]();
+          e.stopPropagation();
+        }
+      });
+
       var PTContainers = new Containers();
 
       /**

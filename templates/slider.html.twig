@@ -4,7 +4,14 @@
  * Template for the slider element.
  */
 #}
-<div class="form-item form-type-slider">
+{%
+    set classes = [
+    'js-form-item',
+    'form-item',
+    'form-type-slider',
+    ]
+%}
+<div{{ attributes.addClass(classes) }}>
     <label for="{{ element['#id'] }}-value">
         {{element['#title']}}: <span id="{{ element['#id'] }}-info">{{ element['#value'].slider }}</span>
     </label>

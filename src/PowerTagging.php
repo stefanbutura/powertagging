@@ -29,9 +29,6 @@ class PowerTagging {
   protected $PPXApi;
   protected $result;
 
-  const UPLOAD_MAX_FILE_SIZE = 2; // Unit is in MB.
-  const UPLOAD_MAX_FILE_COUNT = 5;
-
   /**
    * PowerTagging constructor.
    *
@@ -112,7 +109,14 @@ class PowerTagging {
         ], ' ', strip_tags($content)), ENT_COMPAT, 'UTF-8'));
 
         if (!empty($content)) {
-          $extraction = $this->PPXApi->extractConcepts($content, $project_languages[$settings['entity_language']], $param, 'text');
+          // Annotation.
+          if ($project_config['mode'] == 'annotation') {
+            $extraction = $this->PPXApi->extractConcepts($content, $project_languages[$settings['entity_language']], $param, 'text');
+          }
+          // Classification.
+          else {
+            $extraction = $this->PPXApi->extractCategories($content, $project_languages[$settings['entity_language']], $param, 'text');
+          }
           $extracted_tags = $this->extractTags($extraction, $settings);
           $tags['content'] = $extracted_tags;
           $suggestion['concepts'] = array_merge($suggestion['concepts'], $extracted_tags['concepts']);
@@ -121,15 +125,29 @@ class PowerTagging {
 
         if (!empty($files)) {
           $tags['files'] = [];
+          $extracted_files_count = 0;
           foreach ($files as $file_id) {
             $file = File::load($file_id);
             // Use only existing files for tagging.
-            if (file_exists($file->getFileUri())) {
-              $extraction = $this->PPXApi->extractConcepts($file, $project_languages[$settings['entity_language']], $param, 'file');
+            if (file_exists($file->getFileUri()) && $file->getSize() <= $settings['max_file_size']) {
+              // Annotation.
+              if ($project_config['mode'] == 'annotation') {
+                $extraction = $this->PPXApi->extractConcepts($file, $project_languages[$settings['entity_language']], $param, 'file');
+              }
+              // Classification.
+              else {
+                $extraction = $this->PPXApi->extractCategories($file, $project_languages[$settings['entity_language']], $param, 'file');
+              }
               $extracted_tags = $this->extractTags($extraction, $settings);
-              $tags['files'][$file->getFilename()] = $extracted_tags;
-              $suggestion['concepts'] = array_merge($suggestion['concepts'], $extracted_tags['concepts']);
-              $suggestion['freeterms'] = array_merge($suggestion['freeterms'], $extracted_tags['freeterms']);
+              if (!(empty($extracted_tags['concepts']) && empty($extracted_tags['freeterms']))) {
+                $tags['files'][$file->getFilename()] = $extracted_tags;
+                $suggestion['concepts'] = array_merge($suggestion['concepts'], $extracted_tags['concepts']);
+                $suggestion['freeterms'] = array_merge($suggestion['freeterms'], $extracted_tags['freeterms']);
+                $extracted_files_count++;
+              }
+              if ($extracted_files_count >= $settings['max_file_count']) {
+                break;
+              }
             }
           }
         }
@@ -224,6 +242,33 @@ class PowerTagging {
             'score' => $concept['score'],
             'type' => 'concept',
           ];
+        }
+      }
+    }
+
+    // Go through the categories if available (handle them as normal concepts).
+    if (empty($concepts) && isset($extraction['categories']) && !empty($extraction['categories'])) {
+      $max_categories = (int) $settings['concepts_per_extraction'];
+      foreach ($extraction['categories'] as $category) {
+        $concepts[] = $category;
+        if (count($concepts) >= $max_categories) {
+          break;
+        }
+      }
+
+      // Get the corresponding taxonomy term id.
+      $this->addTermId($concepts, $settings['taxonomy_id'], 'concepts', $settings['entity_language']);
+
+      // Ignore all not found taxonomy terms.
+      if (!empty($concepts)) {
+        foreach ($concepts as $concept) {
+          $tags['concepts'][] = array(
+            'tid' => $concept['tid'],
+            'uri' => $concept['uri'],
+            'label' => $concept['prefLabel'],
+            'score' => $concept['score'],
+            'type' => 'concept',
+          );
         }
       }
     }
@@ -1152,8 +1197,8 @@ class PowerTagging {
       'fields' => $tag_fields,
       'skip_tagged_content' => (isset($settings['skip_tagged_content']) ? $settings['skip_tagged_content'] : FALSE),
       'default_tags_field' => (isset($field_settings['settings']['default_tags_field']) ? $field_settings['settings']['default_tags_field'] : ''),
-      'max_file_size' => (isset($field_settings['settings']['file_upload']['max_file_size']) ? $field_settings['settings']['file_upload']['max_file_size'] : (self::UPLOAD_MAX_FILE_SIZE * 1048576)),
-      'max_file_count' => (isset($field_settings['settings']['file_upload']['max_file_count']) ? $field_settings['settings']['file_upload']['max_file_count'] : self::UPLOAD_MAX_FILE_COUNT),
+      'max_file_size' => (isset($field_settings['settings']['file_upload']['max_file_size']) ? $field_settings['settings']['file_upload']['max_file_size'] : (2 * 1048576)),
+      'max_file_count' => (isset($field_settings['settings']['file_upload']['max_file_count']) ? $field_settings['settings']['file_upload']['max_file_count'] : 5),
     );
 
     // Merge in the additional settings.

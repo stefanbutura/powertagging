@@ -64,9 +64,13 @@ class PowerTaggingConfigForm extends EntityForm {
     ];
 
     $connection = $powertagging_config->getConnection();
+    /** @var \Drupal\semantic_connector\Api\SemanticConnectorPPXApi $ppx_api */
+    $ppx_api = $connection->getApi('PPX');
+    /** @var \Drupal\semantic_connector\Api\SemanticConnectorPPTApi $ppt_api */
+    $ppt_api = $connection->getApi('PPT');
 
     // Get the connected project.
-    $projects = $connection->getApi('PPX')->getProjects();
+    $projects = $ppx_api->getProjects();
     $project = NULL;
     if (!empty($projects)) {
       foreach ($projects as $project) {
@@ -149,14 +153,43 @@ class PowerTaggingConfigForm extends EntityForm {
         );
       }
 
-      // TODO: Get the list oft the corpora via the API.
-      $form['project_settings']['corpus_id'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Enter a corpus ID if one exists on the PoolParty server'),
-        '#default_value' => (!empty($config['project']['corpus_id']) ? $config['project']['corpus_id'] : ''),
-        '#field_prefix' => t('corpus:'),
-        '#attributes' => array('style' => array('width:auto')),
+      $form['project_settings']['mode'] = array(
+        '#type' => 'radios',
+        '#title' => t('PowerTagging mode'),
+        '#options' => array(
+          'annotation' => '<b>' . t('Annotation') . '</b> ' .  t('(use the whole thesaurus to tag the content)'),
+          'classification' => '<b>' . t('Classification') . '</b> ' .  t('(categorize the content on the top concept level)'),
+        ),
+        '#default_value' => (isset($config['project']['mode']) ? $config['project']['mode'] : 'annotation'),
+        '#required' => TRUE,
       );
+
+      // Get the corpus options for the currently configured PoolParty server.
+      $corpus_options = array();
+      $corpora = $ppt_api->getCorpora($project['uuid']);
+      foreach ($corpora as $corpus) {
+        $corpus_options[$corpus['corpusId']] = $corpus['corpusName'];
+      }
+      // Get the default value for the corpus selection.
+      $corpus_id = '';
+      if (isset($config['project']['corpus_id']) && !empty($config['project']['corpus_id'])) {
+        $corpus_id = $config['project']['corpus_id'];
+      }
+      $form['project_settings']['corpus_id'] = array(
+        '#type' => 'select',
+        '#title' => t('Select the corpus to use'),
+        '#description' => t('Usage of a good corpus can improve your free terms considerably.'),
+        '#options' => $corpus_options,
+        '#default_value' => $corpus_id,
+        "#empty_option" => !empty($corpus_options) ? '' : t('- No corpus available -'),
+        '#states' => array(
+          'visible' => array(':input[name="project_settings[mode]"]' => array('value' => 'annotation')),
+        ),
+      );
+
+      if (isset($overridden_values['corpus_id'])) {
+        $form['project_settings']['corpus_id']['#description'] = '<span class="semantic-connector-overridden-value">' . t('Warning: overridden by variable') . '</span>';
+      }
     }
     else {
       $form['project_settings']['errors'] = array(
@@ -172,6 +205,15 @@ class PowerTaggingConfigForm extends EntityForm {
       '#group' => 'settings',
     ];
     static::addLimitsForm($form['global_limit_settings'], $config['limits']);
+
+    // The most part of the global limits are only visible when PowerTagging is
+    // used for annotation.
+    $form['global_limit_settings']['concepts']['concepts_threshold']['#states'] = array(
+      'visible' => array(':input[name="project_settings[mode]"]' => array('value' => 'annotation')),
+    );
+    $form['global_limit_settings']['freeterms']['#states'] = array(
+      'visible' => array(':input[name="project_settings[mode]"]' => array('value' => 'annotation')),
+    );
 
     $fields = $powertagging_config->getFields();
     if (!empty($fields)) {
@@ -267,6 +309,7 @@ class PowerTaggingConfigForm extends EntityForm {
         'languages' => $values['project_settings']['languages'],
         'taxonomy_id' => $values['project_settings']['taxonomy_id'],
         'corpus_id' => $values['project_settings']['corpus_id'],
+        'mode' => $values['project_settings']['mode'],
       ],
       'limits' => [
         'concepts_per_extraction' => $values['concepts_per_extraction'],
@@ -387,13 +430,13 @@ class PowerTaggingConfigForm extends EntityForm {
   public static function addLimitsForm(array &$form, array $config, $tree = FALSE) {
     $form['concepts'] = array(
       '#type' => 'fieldset',
-      '#title' => t('Concept settings'),
+      '#title' => t('Concept / Category settings'),
       '#description' => t('Concepts are available in the thesaurus.'),
       '#tree' => $tree,
     );
 
     $form['concepts']['concepts_per_extraction'] = array(
-      '#title' => t('Max concepts per extraction'),
+      '#title' => t('Max concepts / categories per extraction'),
       '#type' => 'slider',
       '#default_value' => $config['concepts_per_extraction'],
       '#min' => 0,
@@ -401,7 +444,7 @@ class PowerTaggingConfigForm extends EntityForm {
       '#step' => 1,
       '#slider_style' => 'concept',
       '#slider_length' => '500px',
-      '#description' => t('Maximum number of concepts to be displayed as a tagging result.'),
+      '#description' => t('Maximum number of concepts (or categories when the PowerTagging mode is set to "Classification") to be displayed as a tagging result.'),
     );
 
     $form['concepts']['concepts_threshold'] = array(

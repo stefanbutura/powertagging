@@ -14,8 +14,10 @@ use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\URL;
 use Drupal\Core\Validation\Plugin\Validation\Constraint\AllowedValuesConstraint;
 use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
 use Drupal\powertagging\Form\PowerTaggingConfigForm;
+use Drupal\powertagging\PowerTagging;
 
 /**
  * Plugin implementation of the 'powertagging_tags' field type.
@@ -170,6 +172,8 @@ class PowerTaggingTagsItem extends FieldItemBase {
    * {@inheritdoc}
    */
   public static function defaultFieldSettings() {
+    $max_file_size = file_upload_max_size();
+
     return [
         'include_in_tag_glossary' => FALSE,
         'automatically_tag_new_entities' => FALSE,
@@ -177,6 +181,10 @@ class PowerTaggingTagsItem extends FieldItemBase {
         'fields' => [],
         'default_tags_field' => '',
         'limits' => [],
+        'file_upload' => array(
+          'max_file_size' => ($max_file_size > (2 * 1048576)) ? (2 * 1048576) : $max_file_size,
+          'max_file_count' => 5
+        )
       ] + parent::defaultFieldSettings();
   }
 
@@ -212,43 +220,6 @@ class PowerTaggingTagsItem extends FieldItemBase {
       ];
     }
 
-    // Show the fields that can be used for tagging.
-    $options = $this->getSupportedTaggingFields($field->getTargetEntityTypeId(), $field->getTargetBundle());
-    $form['fields'] = [
-      '#type' => 'checkboxes',
-      '#title' => t('Fields that can be used for tagging'),
-      '#description' => t('Select the fields from witch the concepts and free terms are extracted.'),
-      '#options' => $options,
-      '#default_value' => $field->getSetting('fields'),
-      '#required' => TRUE,
-    ];
-
-    // Limit settings.
-    $form['limits'] = [
-      '#type' => 'details',
-      '#title' => t('Limit settings'),
-      '#open' => TRUE,
-    ];
-
-    $powertagging_id = $field->getFieldStorageDefinition()
-      ->getSetting('powertagging_id');
-    $powertagging_config = PowerTaggingConfig::load($powertagging_id)
-      ->getConfig();
-    $limits = empty($field->getSetting('limits')) ? $powertagging_config['limits'] : $field->getSetting('limits');
-
-    PowerTaggingConfigForm::addLimitsForm($form['limits'], $limits, TRUE);
-    foreach (array('concepts', 'freeterms') as $concept_type) {
-      $form['limits'][$concept_type]['#description'] .= '<br />' . t('Note: These settings override the global settings defined in the connected PowerTagging configuration.');
-    }
-
-    $form['limits']['freeterms']['custom_freeterms'] = array(
-      '#type' => 'checkbox',
-      '#title' => 'Allow users to add custom free terms',
-      '#description' => 'If this options is enabled users can add custom freeterms by writing text in the search-box of the PowerTagging widget and clicking the enter key.',
-      '#default_value' => $field->getSetting('custom_freeterms'),
-      '#parents' => array('settings', 'custom_freeterms'),
-    );
-
     // Show a checkbox for the including in a glossary if the "Smart Glossary"
     // module is installed and enabled.
     if (\Drupal::moduleHandler()->moduleExists('smart_glossary')) {
@@ -267,6 +238,106 @@ class PowerTaggingTagsItem extends FieldItemBase {
       '#default_value' => $field->getSetting('automatically_tag_new_entities'),
       '#empty_value' => '',
     );
+
+    // Limit settings.
+    $form['limits'] = [
+      '#type' => 'details',
+      '#title' => t('Limit settings'),
+      '#open' => TRUE,
+    ];
+
+    $powertagging_id = $field->getFieldStorageDefinition()
+      ->getSetting('powertagging_id');
+    $powertagging_config = PowerTaggingConfig::load($powertagging_id);
+    $powertagging_config_settings = $powertagging_config->getConfig();
+    $limits = empty($field->getSetting('limits')) ? $powertagging_config_settings['limits'] : $field->getSetting('limits');
+
+    $powertagging_mode = $powertagging_config_settings['project']['mode'];
+    PowerTaggingConfigForm::addLimitsForm($form['limits'], $limits, TRUE);
+    foreach (array('concepts', 'freeterms') as $concept_type) {
+      $form['limits'][$concept_type]['#description'] .= '<br />' . t('Note: These settings override the global settings defined in the connected PowerTagging configuration.');
+    }
+
+    // The most part of the global limits are only visible when PowerTagging is
+    // used for annotation.
+    if ($powertagging_mode == 'classification') {
+      $form['limits']['concepts']['concepts_threshold']['#access'] = FALSE;
+      $form['limits']['freeterms']['#access'] = FALSE;
+    }
+
+
+    $form['limits']['freeterms']['custom_freeterms'] = array(
+      '#type' => 'checkbox',
+      '#title' => 'Allow users to add custom free terms',
+      '#description' => 'If this options is enabled users can add custom freeterms by writing text in the search-box of the PowerTagging widget and clicking the enter key.',
+      '#default_value' => $field->getSetting('custom_freeterms'),
+      '#parents' => array('settings', 'custom_freeterms'),
+    );
+
+    // Show the fields that can be used for tagging.
+    $options = $this->getSupportedTaggingFields($field->getTargetEntityTypeId(), $field->getTargetBundle());
+    $form['fields'] = [
+      '#type' => 'checkboxes',
+      '#title' => t('Fields that can be used for tagging'),
+      '#description' => t('Select the fields from witch the concepts and free terms are extracted.'),
+      '#options' => $options,
+      '#default_value' => $field->getSetting('fields'),
+      '#required' => TRUE,
+    ];
+
+    // Add file upload settings if the content type has the appropriate fields.
+    $allowed_modules = array('file', 'media');
+    $state_fields_list = array();
+    foreach ($options as $field_name => $title) {
+      $field_storage = FieldStorageConfig::loadByName($field->getTargetEntityTypeId(), $field_name);
+      if (!is_null($field_storage)) {
+        if (in_array($field_storage->getTypeProvider(), $allowed_modules)) {
+          $state_fields_list[] = ':input[name="settings[fields][' . $field_name . ']"]';
+        }
+      }
+    }
+
+    if (!empty($state_fields_list)) {
+      $file_upload_settings = $field->getSetting('file_upload');
+      $state_fields = implode(', ', $state_fields_list);
+      $form['file_upload'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('File extraction settings'),
+        '#collapsible' => FALSE,
+        '#states' => array(
+          'visible' => array($state_fields => array('checked' => TRUE)),
+        ),
+      );
+
+      // Add max file size to the form.
+      $max_file_size = floor(file_upload_max_size() / 1048576);
+      $max_file_size = ($max_file_size > 10) ? 10 : $max_file_size;
+      $file_size_options = array();
+      for ($i = 1; $i <= $max_file_size; $i++) {
+        $file_size_options[$i * 1048576] = $i . ' MB';
+      }
+      $default_max_file_size = (isset($file_upload_settings['max_file_size']) && $max_file_size > ($file_upload_settings['max_file_size'] / 1048576)) ? ($file_upload_settings['max_file_size'] / 1048576) : $max_file_size;
+      $form['file_upload']['max_file_size'] = array(
+        '#type' => 'select',
+        '#title' => t('Maximum file size for each attached file'),
+        '#description' => t('Only files below the specified value are used for the extraction.'),
+        '#options' => $file_size_options,
+        '#default_value' => ($default_max_file_size * 1048576),
+      );
+
+      // Add max file count to the form.
+      $file_count_options = array();
+      for ($i = 1; $i <= 10; $i++) {
+        $file_count_options[$i] = $i;
+      }
+      $form['file_upload']['max_file_count'] = array(
+        '#type' => 'select',
+        '#title' => t('Maximum number of files per node'),
+        '#description' => t('Only the specified number of files are used for the extraction per node.'),
+        '#options' => $file_count_options,
+        '#default_value' => (isset($file_upload_settings['max_file_count']) ? $file_upload_settings['max_file_count']: 5),
+      );
+    }
 
     return $form;
   }
@@ -291,6 +362,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
       'fields' => $settings['fields'],
       'default_tags_field' => $settings['default_tags_field'],
       'limits' => $limits,
+      'file_upload' => $settings['file_upload']
     ];
   }
 

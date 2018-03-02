@@ -354,6 +354,7 @@ class PowerTaggingTagsWidget extends WidgetBase {
       }
     }
 
+    $file_upload_settings = $field->getSetting('file_upload');
     $settings = [];
     $settings[$field->getName()] = [
       'fields' => $this->getSelectedTaggingFields($field),
@@ -365,10 +366,12 @@ class PowerTaggingTagsWidget extends WidgetBase {
         'concepts_threshold' => $limits['concepts_threshold'],
         'freeterms_per_extraction' => $limits['freeterms_per_extraction'],
         'freeterms_threshold' => $limits['freeterms_threshold'],
-        'custom_freeterms' => !is_null($field->getSetting('custom_freeterms')) ? $field->getSetting('custom_freeterms') : TRUE,
+        'custom_freeterms' => ($powertagging_config['project']['mode'] == 'annotation' ? (!is_null($field->getSetting('custom_freeterms')) ? $field->getSetting('custom_freeterms') : TRUE) : FALSE),
         'entity_language' => $langcode,
         'allowed_languages' => $allowed_langcodes,
         'corpus_id' => $powertagging_config['project']['corpus_id'],
+        'max_file_size' => (isset($file_upload_settings['max_file_size']) ? $file_upload_settings['max_file_size'] : (2 * 1048576)),
+        'max_file_count' => (isset($file_upload_settings['max_file_count']) ? $file_upload_settings['max_file_count'] : 5),
       ],
       'selected_tags' => $selected_tags,
     ];

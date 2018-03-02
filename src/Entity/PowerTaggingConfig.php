@@ -422,6 +422,7 @@ class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigI
         'languages' => ['en' => 'en'],
         'taxonomy_id' => '',
         'corpus_id' => '',
+        'mode' => 'annotation',
       ],
       'limits' => [
         'concepts_per_extraction' => 20,
