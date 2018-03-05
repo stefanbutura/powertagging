@@ -6,7 +6,7 @@
  */
 
 namespace Drupal\powertagging\Form;
-use Drupal\Core\Entity\EntityConfirmFormBase;
+use Drupal\Core\Form\ConfirmFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Url;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
@@ -15,13 +15,22 @@ use Drupal\semantic_connector\SemanticConnector;
 /**
  * Start the taxonomy term updating for a PowerTagging configuration.
  */
-class PowerTaggingRefreshExtractionModelForm extends EntityConfirmFormBase{
+class PowerTaggingRefreshExtractionModelForm extends ConfirmFormBase {
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getFormId() {
+    return 'powertagging_refresh_extraction_model_form';
+  }
+
+
   /**
    * {@inheritdoc}
    */
   public function getQuestion() {
     /** @var PowerTaggingConfig $entity */
-    $entity = $this->entity;
+    $entity = \Drupal::routeMatch()->getParameter('powertagging_config');
 
     // Get the project label.
     $connection_config = $entity->getConnection()->getConfig();
@@ -49,7 +58,7 @@ class PowerTaggingRefreshExtractionModelForm extends EntityConfirmFormBase{
    * {@inheritdoc}
    */
   public function getCancelURL() {
-    return Url::fromRoute('entity.powertagging.edit_config_form', ['powertagging' => $this->entity->id()]);
+    return Url::fromUserInput(\Drupal::request()->getRequestUri());
   }
 
   /**
@@ -64,7 +73,7 @@ class PowerTaggingRefreshExtractionModelForm extends EntityConfirmFormBase{
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
     /** @var PowerTaggingConfig $entity */
-    $entity = $this->getEntity();
+    $entity = \Drupal::routeMatch()->getParameter('powertagging_config');
 
     /** @var \Drupal\semantic_connector\Api\SemanticConnectorPPTApi $ppt_api */
     $ppt_api = $entity->getConnection()
@@ -97,7 +106,7 @@ class PowerTaggingRefreshExtractionModelForm extends EntityConfirmFormBase{
       }
     }
     else {
-      drupal_set_message(t('An error occurred while refreshing the extraction model for project "%projectname".', array('@projectname' => $project_label) . (isset($result['message']) && !empty($result['message'])) ? ' message: ' . $result['message'] : ''), 'error');
+      drupal_set_message(t('An error occurred while refreshing the extraction model for project "%projectname".', array('%projectname' => $project_label)) . ((isset($result['message']) && !empty($result['message'])) ? ' message: ' . $result['message'] : ''), 'error');
     }
 
     $form_state->setRedirect('entity.powertagging.edit_config_form', array('powertagging' => $entity->id()));

@@ -1,6 +1,6 @@
 powertagging_similar.overview:
-  title: 'Similar Content'
+  title: 'SeeAlso Engine'
   route_name: entity.powertagging_similar.collection
-  description: 'Manage PowerTagging Similar Content widgets.'
+  description: 'Manage PowerTagging SeeAlso widgets.'
   parent: powertagging.overview
   weight: 2

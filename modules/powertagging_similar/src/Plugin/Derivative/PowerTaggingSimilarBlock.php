@@ -26,7 +26,7 @@ class PowerTaggingSimilarBlock extends DeriverBase {
     /** @var PowerTaggingSimilarConfig $powertagging_similar_config */
     foreach ($powertagging_configs as $powertagging_similar_config) {
       $this->derivatives[$powertagging_similar_config->id()] = $base_plugin_definition;
-      $this->derivatives[$powertagging_similar_config->id()]['admin_label'] = t('PowerTagging Similar Content widget "@configtitle"', array('@configtitle' => $powertagging_similar_config->getTitle()));
+      $this->derivatives[$powertagging_similar_config->id()]['admin_label'] = t('PowerTagging SeeAlso widget "@configtitle"', array('@configtitle' => $powertagging_similar_config->getTitle()));
     }
     return $this->derivatives;
   }

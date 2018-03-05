@@ -16,7 +16,7 @@ class PowerTaggingSimilarConfigDeleteForm extends EntityConfirmFormBase{
    * {@inheritdoc}
    */
   public function getQuestion() {
-    return $this->t('Are you sure you want to delete PowerTagging Similar Content widget "%name"?', array('%name' => $this->entity->get('title')));
+    return $this->t('Are you sure you want to delete PowerTagging SeeAlso widget "%name"?', array('%name' => $this->entity->get('title')));
   }
 
   /**
@@ -45,7 +45,7 @@ class PowerTaggingSimilarConfigDeleteForm extends EntityConfirmFormBase{
     $entity = $this->getEntity();
     $entity->delete();
 
-    drupal_set_message(t('PowerTagging Similar Content widget "%title" has been deleted.', array('%title' => $entity->getTitle())));
+    drupal_set_message(t('PowerTagging SeeAlso widget "%title" has been deleted.', array('%title' => $entity->getTitle())));
     $form_state->setRedirect('entity.powertagging.collection');
   }
 }

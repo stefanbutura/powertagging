@@ -11,7 +11,7 @@ use Drupal\powertagging_similar\PowerTaggingSimilar;
  *
  * @Block(
  *   id = "powertagging_similar_block",
- *   admin_label = @Translation("PowerTagging Similar Content widget"),
+ *   admin_label = @Translation("PowerTagging SeeAlso widget"),
  *   deriver = "Drupal\powertagging_similar\Plugin\Derivative\PowerTaggingSimilarBlock"
  * )
  */

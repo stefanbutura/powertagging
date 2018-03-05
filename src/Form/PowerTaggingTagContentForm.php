@@ -6,8 +6,10 @@
 
 namespace Drupal\powertagging\Form;
 
+use Drupal\Component\Render\FormattableMarkup;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Link;
 use Drupal\Core\Url;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
@@ -239,6 +241,8 @@ class PowerTaggingTagContentForm extends FormBase {
       $context['results']['processed'] = 0;
       $context['results']['tagged'] = 0;
       $context['results']['skipped'] = 0;
+      $context['results']['error_count'] = 0;
+      $context['results']['error'] = array();
       $context['results']['powertagging_id'] = $tag_settings['powertagging_id'];
     }
 
@@ -247,9 +251,18 @@ class PowerTaggingTagContentForm extends FormBase {
     $tag_settings['powertagging_config'] = $powertagging_config;
 
     // Load the entities.
-    $entities = \Drupal::entityTypeManager()
-      ->getStorage($entity_type_id)
-      ->loadMultiple($entity_ids);
+    $entities = [];
+    try {
+      $entities = \Drupal::entityTypeManager()
+        ->getStorage($entity_type_id)
+        ->loadMultiple($entity_ids);
+    }
+    catch (\Exception $e) {
+      watchdog_exception('PowerTagging Batch Process', $e, 'Unable to load entities with ids: %ids. ' . $e->getMessage(), array('%ids' => print_r($entity_ids, TRUE)));
+      $context['results']['processed'] += count($entity_ids);
+      $context['results']['error_count'] += count($entity_ids);
+      $context['results']['error']['loading'] = array_merge($context['results']['error']['loading'], $entity_ids);
+    }
 
     $powertagging = new PowerTagging($powertagging_config);
     $powertagging->tagEntities($entities, $field_type, $tag_settings, $context);
@@ -266,10 +279,11 @@ class PowerTaggingTagContentForm extends FormBase {
       }
     }
 
-    $context['message'] = t('Processed entities: %currententities of %totalentities. (Tagged: %taggedentities, Skipped: %skippedentities)', [
+    $context['message'] = t('Processed entities: %currententities of %totalentities. (Tagged: %taggedentities, Skipped: %skippedentities, errors: %error_entities)', [
       '%currententities' => $context['results']['processed'],
       '%taggedentities' => $context['results']['tagged'],
       '%skippedentities' => $context['results']['skipped'],
+      '%error_entities' => $context['results']['error_count'],
       '%totalentities' => $batch_info['total'],
     ]);
     $context['message'] .= '<br />' . t('Remaining time: %remainingtime.', ['%remainingtime' => $time_string]);
@@ -279,29 +293,83 @@ class PowerTaggingTagContentForm extends FormBase {
    * Batch 'finished' callback used by PowerTagging Bulk Tagging.
    */
   public static function tagContentBatchFinished($success, $results, $operations) {
-    drupal_set_message(t('Successfully finished bulk tagging of %totalentities entities. (Tagged: %taggedentities, Skipped: %skippedentities)', [
-      '%totalentities' => $results['processed'],
-      '%taggedentities' => $results['tagged'],
-      '%skippedentities' => $results['skipped'],
-    ]));
+    if ($success) {
+      $message = t('Successfully finished content tagging of %total_entities entities on %date:', [
+          '%total_entities' => $results['processed'],
+          '%date' => \Drupal::service('date.formatter')->format($results['end_time'], 'short')
+        ]) . '<br />';
+      $message .= t('<ul><li>tagged: %tagged_entities</li><li>skipped: %skipped_entities</li><li>errors: %error_entities</li></ul>', [
+        '%tagged_entities' => $results['tagged'],
+        '%skipped_entities' => $results['skipped'],
+        '%error_entities' => self::createErrorList($results['error']),
+      ]);
+      drupal_set_message(new FormattableMarkup($message, array()));
 
-    if (isset($results['powertagging_id'])) {
-      // Update the time of the most recent batch.
-      $powertagging_config = PowerTaggingConfig::load($results['powertagging_id']);
-      $settings = $powertagging_config->getConfig();
-      $settings['last_batch_tagging'] = time();
-      $powertagging_config->setConfig($settings);
-      $powertagging_config->save();
+      if (isset($results['powertagging_id'])) {
+        // Update the time of the most recent batch.
+        $powertagging_config = PowerTaggingConfig::load($results['powertagging_id']);
+        $settings = $powertagging_config->getConfig();
+        $settings['last_batch_tagging'] = time();
+        $powertagging_config->setConfig($settings);
+        $powertagging_config->save();
 
-      // If there are any global notifications and they could be caused by a
-      // missing retagging action, refresh the notifications.
-      $notifications = \Drupal::config('semantic_connector.settings')->get('global_notifications');
-      if (!empty($notifications)) {
-        $notification_config = SemanticConnector::getGlobalNotificationConfig();
-        if (isset($notification_config['actions']['powertagging_retag_content']) && $notification_config['actions']['powertagging_retag_content']) {
-          SemanticConnector::checkGlobalNotifications(TRUE);
+        // If there are any global notifications and they could be caused by a
+        // missing retagging action, refresh the notifications.
+        $notifications = \Drupal::config('semantic_connector.settings')->get('global_notifications');
+        if (!empty($notifications)) {
+          $notification_config = SemanticConnector::getGlobalNotificationConfig();
+          if (isset($notification_config['actions']['powertagging_retag_content']) && $notification_config['actions']['powertagging_retag_content']) {
+            SemanticConnector::checkGlobalNotifications(TRUE);
+          }
         }
       }
     }
+    else {
+      $error_operation = reset($operations);
+      $message = t('An error occurred while processing %error_operation on %date', array(
+          '%error_operation' => $error_operation[0],
+          '%date' => \Drupal::service('date.formatter')->format($results['end_time'], 'short'),
+        )) . '<br />';
+      $message .= t('<ul><li>arguments: %arguments</li></ul>', array(
+        '@arguments' => print_r($error_operation[1], TRUE),
+      ));
+      drupal_set_message($message, 'error');
+    }
+  }
+
+  /**
+   * Creates an error list with links to entities.
+   *
+   * @param array $errors
+   *   A list of entity-ids grouped by entity type and error type.
+   *
+   * @return string
+   *   An unsorted list of links to entities.
+   */
+  private static function createErrorList($errors) {
+    if (empty($errors)) {
+      return '0';
+    }
+    $item_types = array();
+    foreach ($errors as $error_type => $entities) {
+      $items = array();
+      foreach ($entities as $entity_type => $ids) {
+        $current_entities = [];
+        try {
+          $current_entities = \Drupal::entityTypeManager()
+            ->getStorage($entity_type)
+            ->loadMultiple($ids);
+        }
+        catch (\Exception $exception) {}
+
+        /** @var \Drupal\Core\Entity\ContentEntityBase $entity */
+        foreach ($current_entities as $entity) {
+          $items[] = '<li>' . Link::fromTextAndUrl($entity->label(), $entity->toUrl())->toString() . '</li>';
+        }
+      }
+      $item_types[] = '<li>' . t($error_type) . ': <ul>' . implode('', $items) . '</ul></li>';
+    }
+
+    return '<ul>' . implode('', $item_types) . '</ul>';
   }
 }

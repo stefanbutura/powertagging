@@ -61,14 +61,33 @@ class PowerTaggingController extends ControllerBase implements ContainerInjectio
     $content = isset($_POST['content']) ? $_POST['content'] : '';
     $files = isset($_POST['files']) ? $_POST['files'] : [];
     $settings = $_POST['settings'];
+    $tags = array();
 
     // Remove line breaks and HTML tags from the content and convert HTML
     // characters to normal ones.
     $content = html_entity_decode(str_replace(array("\r", "\n", "\t"), "", strip_tags($content)), ENT_COMPAT, 'UTF-8');
 
-    $powertagging = new PowerTagging($powertagging_config);
-    $powertagging->extract($content, $files, $settings);
-    echo Json::encode($powertagging->getResult());
+    try {
+      $powertagging = new PowerTagging($powertagging_config);
+      $powertagging->extract($content, $files, $settings);
+      $tags = $powertagging->getResult();
+
+      if (empty($tags['messages']) && empty($tags['suggestion']['concepts']) && empty($tags['suggestion']['freeterms'])) {
+        $tags['messages'][] = array(
+          'type' => 'warning',
+          'message' => t('No concepts or freeterms could be extracted from the entity\'s content.'),
+        );
+      }
+    }
+    catch (\Exception $e) {
+      $tags['suggestion'] = array();
+      $tags['messages'][] = array(
+        'type' => 'error',
+        'message' => t('Error while extracting tags.') . ' ' . $e->getMessage(),
+      );
+    }
+
+    echo Json::encode($tags);
     exit();
   }
 

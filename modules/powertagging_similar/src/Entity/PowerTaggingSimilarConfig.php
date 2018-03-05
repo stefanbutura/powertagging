@@ -10,7 +10,7 @@ use Drupal\Core\Config\Entity\ConfigEntityBase;
 /**
  * @ConfigEntityType(
  *   id ="powertagging_similar",
- *   label = @Translation("PowerTagging Similar Content configuration"),
+ *   label = @Translation("PowerTagging SeeAlso widget configuration"),
  *   handlers = {
  *     "list_builder" = "Drupal\powertagging_similar\PowerTaggingSimilarConfigListBuilder",
  *     "form" = {

@@ -79,7 +79,7 @@ class PowerTaggingSimilarConfigForm extends EntityForm {
         $added_field_keys = array();
 
         // Add existing configuration first.
-        if (!empty($configuration['content_types']) && isset($configuration['content_types'][$powertagging_id])) {
+        if (!empty($configuration['content_types']) && isset($configuration['content_types'][$powertagging_id]) && is_array($configuration['content_types'][$powertagging_id])) {
           foreach ($configuration['content_types'][$powertagging_id] as $content_type) {
             // Check if this content type still exists.
             if (isset($fields[$content_type['entity_key']])) {
@@ -180,7 +180,7 @@ class PowerTaggingSimilarConfigForm extends EntityForm {
       '#description' => t('How to display the items in the list of similar content.'),
       '#options' => array(
         'default' => 'Title as a link (default)',
-        'view_mode' => 'Customized display ("Powertagging similar content" view mode)'
+        'view_mode' => 'Customized display ("Powertagging SeeAlso widget" view mode)'
       ),
       '#default_value' => $configuration['display_type'],
     );
@@ -256,10 +256,10 @@ class PowerTaggingSimilarConfigForm extends EntityForm {
     if ($is_new) {
       // Configuration entities need an ID manually set.
       $entity->set('id', SemanticConnector::createUniqueEntityMachineName('powertagging_similar', $entity->get('title')));
-      drupal_set_message(t('Powertagging Similar Content widget %title has been created.', array('%title' => $entity->get('title'))));
+      drupal_set_message(t('Powertagging SeeAlso widget %title has been created.', array('%title' => $entity->get('title'))));
     }
     else {
-      drupal_set_message(t('Updated Powertagging Similar Content widget %title.',
+      drupal_set_message(t('Updated Powertagging SeeAlso widget %title.',
         array('%title' => $entity->get('title'))));
     }
 

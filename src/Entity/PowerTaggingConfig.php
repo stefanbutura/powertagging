@@ -8,6 +8,7 @@
 namespace Drupal\powertagging\Entity;
 
 use Drupal\Core\Config\Entity\ConfigEntityBase;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\semantic_connector\SemanticConnector;
 
 /**
@@ -284,17 +285,21 @@ class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigI
     foreach ($fields as $entity_type_id => $fields_per_entity_type) {
       foreach ($fields_per_entity_type as $field_type => $field) {
         foreach ($field['bundles'] as $bundle) {
+
           /** @var \Drupal\field\Entity\FieldConfig $field_definition */
-          $field_definition = $entityFieldManager->getFieldDefinitions($entity_type_id, $bundle)[$field_type];
-          $powertagging_id = $field_definition->getFieldStorageDefinition()
-            ->getSetting('powertagging_id');
-          if ($powertagging_id == $this->id()) {
-            $powertagging_fields[] = [
-              'entity_type_id' => $entity_type_id,
-              'bundle' => $bundle,
-              'field_type' => $field_type,
-              'label' => $field_definition->get('label'),
-            ];
+          $field_definitions = $entityFieldManager->getFieldDefinitions($entity_type_id, $bundle);
+          if (isset($field_definitions[$field_type])) {
+            $field_definition = $field_definitions[$field_type];
+            $powertagging_id = $field_definition->getFieldStorageDefinition()
+              ->getSetting('powertagging_id');
+            if ($powertagging_id == $this->id()) {
+              $powertagging_fields[] = [
+                'entity_type_id' => $entity_type_id,
+                'bundle' => $bundle,
+                'field_type' => $field_type,
+                'label' => $field_definition->get('label'),
+              ];
+            }
           }
         }
       }

@@ -64,6 +64,8 @@ class PowerTagging {
    *
    * @return bool
    *   TRUE if the search was successful, FALSE if not.
+   *
+   * @throws \Exception
    */
   public function extract($content, array $files, array $settings) {
     $project_config = $this->config_settings['project'];
@@ -117,10 +119,15 @@ class PowerTagging {
           else {
             $extraction = $this->PPXApi->extractCategories($content, $project_languages[$settings['entity_language']], $param, 'text');
           }
-          $extracted_tags = $this->extractTags($extraction, $settings);
-          $tags['content'] = $extracted_tags;
-          $suggestion['concepts'] = array_merge($suggestion['concepts'], $extracted_tags['concepts']);
-          $suggestion['freeterms'] = array_merge($suggestion['freeterms'], $extracted_tags['freeterms']);
+          if (is_null($extraction)) {
+            throw new \Exception(t('Unable to extract from content.'));
+          }
+          else {
+            $extracted_tags = $this->extractTags($extraction, $settings);
+            $tags['content'] = $extracted_tags;
+            $suggestion['concepts'] = array_merge($suggestion['concepts'], $extracted_tags['concepts']);
+            $suggestion['freeterms'] = array_merge($suggestion['freeterms'], $extracted_tags['freeterms']);
+          }
         }
 
         if (!empty($files)) {
@@ -129,7 +136,10 @@ class PowerTagging {
           foreach ($files as $file_id) {
             $file = File::load($file_id);
             // Use only existing files for tagging.
-            if (file_exists($file->getFileUri()) && $file->getSize() <= $settings['max_file_size']) {
+            if (!file_exists($file->getFileUri())) {
+              throw new \Exception(t('File %file does not exist.', array('%file' => $file->getFilename())));
+            }
+            elseif ($file->getSize() <= $settings['max_file_size']) {
               // Annotation.
               if ($project_config['mode'] == 'annotation') {
                 $extraction = $this->PPXApi->extractConcepts($file, $project_languages[$settings['entity_language']], $param, 'file');
@@ -138,12 +148,17 @@ class PowerTagging {
               else {
                 $extraction = $this->PPXApi->extractCategories($file, $project_languages[$settings['entity_language']], $param, 'file');
               }
-              $extracted_tags = $this->extractTags($extraction, $settings);
-              if (!(empty($extracted_tags['concepts']) && empty($extracted_tags['freeterms']))) {
-                $tags['files'][$file->getFilename()] = $extracted_tags;
-                $suggestion['concepts'] = array_merge($suggestion['concepts'], $extracted_tags['concepts']);
-                $suggestion['freeterms'] = array_merge($suggestion['freeterms'], $extracted_tags['freeterms']);
-                $extracted_files_count++;
+              if (is_null($extraction)) {
+                throw new \Exception(t('Unable to extract from file %file.', array('%file' => $file->getFilename())));
+              }
+              else {
+                $extracted_tags = $this->extractTags($extraction, $settings);
+                if (!(empty($extracted_tags['concepts']) && empty($extracted_tags['freeterms']))) {
+                  $tags['files'][$file->getFilename()] = $extracted_tags;
+                  $suggestion['concepts'] = array_merge($suggestion['concepts'], $extracted_tags['concepts']);
+                  $suggestion['freeterms'] = array_merge($suggestion['freeterms'], $extracted_tags['freeterms']);
+                  $extracted_files_count++;
+                }
               }
               if ($extracted_files_count >= $settings['max_file_count']) {
                 break;
@@ -184,13 +199,6 @@ class PowerTagging {
           }
         }
       }
-    }
-
-    if (empty($tags['messages']) && empty($tags['suggestion']['concepts']) && empty($tags['suggestion']['freeterms'])) {
-      $tags['messages'][] = [
-        'type' => 'info',
-        'message' => t('No concepts or free terms could be extracted from the entity\'s content.'),
-      ];
     }
 
     $this->result = $tags;
@@ -348,14 +356,30 @@ class PowerTagging {
         continue;
       }
 
-      $tags = $this->extractTagsOfEntity($entity, $tag_settings);
+      $tags = [];
+      try {
+        $tags = $this->extractTagsOfEntity($entity, $tag_settings);
+      }
+      catch (\Exception $e) {
+        watchdog_exception('PowerTagging Batch Process', $e, 'Unable to extract concepts from %type with id: %id. ' . $e->getMessage(), array('%type' => $entity->getEntityTypeId(), '%id' => $entity->id()));
+        $context['results']['error_count']++;
+        $context['results']['error']['extracting'][$entity->getEntityTypeId()][] = $entity->id();
+      }
 
       // Set the new taxonomy terms and save the entity.
-      $entity->set($field_type, $tags);
-      $entity->save();
+      try {
+        $entity->set($field_type, $tags);
+        $entity->save();
+      }
+      catch (\Exception $e) {
+        watchdog_exception('PowerTagging Batch Process', $e, 'Unable to save entity with id: %id. ' . $e->getMessage(), array('%id' => $entity->id()));
+        $context['results']['error_count']++;
+        $context['results']['error']['saving'][$entity->getEntityTypeId()][] = $entity->id();
+      }
 
       $context['results']['tagged']++;
     }
+    $context['results']['end_time'] = time();
   }
 
   /**
@@ -546,6 +570,7 @@ class PowerTagging {
     $context['results']['processed'] += count($terms);
     $context['results']['updated'] += $updated_this_batch_count;
     $context['results']['skipped'] += (count($terms) - $updated_this_batch_count);
+    $context['results']['end_time'] = time();
   }
 
   /**
@@ -935,7 +960,7 @@ class PowerTagging {
       // The extraction model was refreshed recently.
       if (is_array($extraction_model_info) && strtotime($extraction_model_info['lastBuildTime']) > $settings['last_batch_tagging']) {
         // Check if the PowerTagging configuration is already connected with content / fields.
-        $fields = $powertagging_config->getFields();
+        $fields = $config->getFields();
         if (!empty($fields)) {
           // Get the project label.
           $connection_config = $config->getConnection()->getConfig();

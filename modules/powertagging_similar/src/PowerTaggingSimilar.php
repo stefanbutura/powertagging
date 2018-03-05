@@ -2,7 +2,7 @@
 
 /**
  * @file
- * The main class of the PowerTagging Similar Content module.
+ * The main class of the PowerTagging SeeAlso Engine module.
  */
 
 namespace Drupal\powertagging_similar;
@@ -22,7 +22,7 @@ class PowerTaggingSimilar {
    * PowerTagging constructor.
    *
    * @param PowerTaggingSimilarConfig $config
-   *   The configuration of the PowerTagging Similar widget.
+   *   The configuration of the PowerTagging SeeAlso widget.
    */
   public function __construct($config) {
     $this->config = $config;
