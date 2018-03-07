@@ -178,6 +178,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
         'include_in_tag_glossary' => FALSE,
         'automatically_tag_new_entities' => FALSE,
         'custom_freeterms' => TRUE,
+        'use_shadow_concepts' => FALSE,
         'fields' => [],
         'default_tags_field' => '',
         'limits' => [],
@@ -220,58 +221,28 @@ class PowerTaggingTagsItem extends FieldItemBase {
       ];
     }
 
-    // Show a checkbox for the including in a glossary if the "Smart Glossary"
-    // module is installed and enabled.
-    if (\Drupal::moduleHandler()->moduleExists('smart_glossary')) {
-      $form['include_in_tag_glossary'] = [
-        '#type' => 'checkbox',
-        '#title' => t('Include in PowerTagging Tag Glossary'),
-        '#description' => t('Show tags of this field in the "PowerTagging Tag Glossary" block (if it is enabled)'),
-        '#default_value' => $field->getSetting('include_in_tag_glossary'),
-      ];
-    }
+    $form['special'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Special settings'),
+      '#collapsible' => FALSE,
+      '#tree' => FALSE,
+    );
 
-    $form['automatically_tag_new_entities'] = array(
+    $form['special']['include_in_tag_glossary'] = [
+      '#type' => 'checkbox',
+      '#title' => t('Include in PowerTagging Tag Glossary'),
+      '#description' => t('Show tags of this field in the "PowerTagging Tag Glossary" block (if it is enabled)'),
+      '#default_value' => $field->getSetting('include_in_tag_glossary'),
+      '#parents' => array('settings', 'include_in_tag_glossary'),
+    ];
+
+    $form['special']['automatically_tag_new_entities'] = array(
       '#type' => 'checkbox',
       '#title' => t('Automatically tag new entities'),
       '#description' => t('When entities get created and don\'t have values for this field yet, they will be tagged automatically.'),
       '#default_value' => $field->getSetting('automatically_tag_new_entities'),
       '#empty_value' => '',
-    );
-
-    // Limit settings.
-    $form['limits'] = [
-      '#type' => 'details',
-      '#title' => t('Limit settings'),
-      '#open' => TRUE,
-    ];
-
-    $powertagging_id = $field->getFieldStorageDefinition()
-      ->getSetting('powertagging_id');
-    $powertagging_config = PowerTaggingConfig::load($powertagging_id);
-    $powertagging_config_settings = $powertagging_config->getConfig();
-    $limits = empty($field->getSetting('limits')) ? $powertagging_config_settings['limits'] : $field->getSetting('limits');
-
-    $powertagging_mode = $powertagging_config_settings['project']['mode'];
-    PowerTaggingConfigForm::addLimitsForm($form['limits'], $limits, TRUE);
-    foreach (array('concepts', 'freeterms') as $concept_type) {
-      $form['limits'][$concept_type]['#description'] .= '<br />' . t('Note: These settings override the global settings defined in the connected PowerTagging configuration.');
-    }
-
-    // The most part of the global limits are only visible when PowerTagging is
-    // used for annotation.
-    if ($powertagging_mode == 'classification') {
-      $form['limits']['concepts']['concepts_threshold']['#access'] = FALSE;
-      $form['limits']['freeterms']['#access'] = FALSE;
-    }
-
-
-    $form['limits']['freeterms']['custom_freeterms'] = array(
-      '#type' => 'checkbox',
-      '#title' => 'Allow users to add custom free terms',
-      '#description' => 'If this options is enabled users can add custom freeterms by writing text in the search-box of the PowerTagging widget and clicking the enter key.',
-      '#default_value' => $field->getSetting('custom_freeterms'),
-      '#parents' => array('settings', 'custom_freeterms'),
+      '#parents' => array('settings', 'automatically_tag_new_entities'),
     );
 
     // Show the fields that can be used for tagging.
@@ -284,6 +255,51 @@ class PowerTaggingTagsItem extends FieldItemBase {
       '#default_value' => $field->getSetting('fields'),
       '#required' => TRUE,
     ];
+
+    // Limit settings.
+    $form['limits'] = [
+      '#type' => 'details',
+      '#title' => t('Threshold settings for concepts / categories and free terms'),
+      '#open' => FALSE,
+    ];
+
+    $powertagging_id = $field->getFieldStorageDefinition()
+      ->getSetting('powertagging_id');
+    $powertagging_config = PowerTaggingConfig::load($powertagging_id);
+    $powertagging_config_settings = $powertagging_config->getConfig();
+    $limits = empty($field->getSetting('limits')) ? $powertagging_config_settings['limits'] : $field->getSetting('limits');
+
+    $powertagging_mode = $powertagging_config_settings['project']['mode'];
+    $powertagging_corpus = $powertagging_config_settings['project']['corpus_id'];
+    PowerTaggingConfigForm::addLimitsForm($form['limits'], $limits, TRUE);
+    foreach (array('concepts', 'freeterms') as $concept_type) {
+      $form['limits'][$concept_type]['#description'] .= '<br />' . t('Note: These settings override the global settings defined in the connected PowerTagging configuration.');
+    }
+
+    // The most part of the global limits are only visible when PowerTagging is
+    // used for annotation.
+    if ($powertagging_mode == 'classification') {
+      $form['limits']['concepts']['concepts_threshold']['#access'] = FALSE;
+      $form['limits']['freeterms']['#access'] = FALSE;
+    }
+
+    if ($powertagging_mode == 'annotation' && !empty($powertagging_corpus)) {
+      $form['limits']['concepts']['use_shadow_concepts'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Also find concepts that are not directly contained within the content'),
+        '#description' => t('It searches for concepts that do not appear in the content but have something to do with it.'),
+        '#default_value' => (!is_null($field->getSetting('use_shadow_concepts')) ? $field->getSetting('use_shadow_concepts') : FALSE),
+        '#parents' => array('settings', 'use_shadow_concepts'),
+      );
+    }
+
+    $form['limits']['freeterms']['custom_freeterms'] = array(
+      '#type' => 'checkbox',
+      '#title' => 'Allow users to add custom free terms',
+      '#description' => 'If this options is enabled users can add custom free terms by writing text in the search-box of the PowerTagging widget and clicking the enter key.',
+      '#default_value' => $field->getSetting('custom_freeterms'),
+      '#parents' => array('settings', 'custom_freeterms'),
+    );
 
     // Add file upload settings if the content type has the appropriate fields.
     $allowed_modules = array('file', 'media');
@@ -301,9 +317,9 @@ class PowerTaggingTagsItem extends FieldItemBase {
       $file_upload_settings = $field->getSetting('file_upload');
       $state_fields = implode(', ', $state_fields_list);
       $form['file_upload'] = array(
-        '#type' => 'fieldset',
+        '#type' => 'details',
         '#title' => t('File extraction settings'),
-        '#collapsible' => FALSE,
+        '#open' => FALSE,
         '#states' => array(
           'visible' => array($state_fields => array('checked' => TRUE)),
         ),
@@ -359,6 +375,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
       'include_in_tag_glossary' => $settings['include_in_tag_glossary'],
       'automatically_tag_new_entities' => $settings['automatically_tag_new_entities'],
       'custom_freeterms' => $settings['custom_freeterms'],
+      'use_shadow_concepts' => $settings['use_shadow_concepts'],
       'fields' => $settings['fields'],
       'default_tags_field' => $settings['default_tags_field'],
       'limits' => $limits,

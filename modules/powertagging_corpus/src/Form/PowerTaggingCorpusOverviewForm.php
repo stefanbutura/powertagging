@@ -37,7 +37,6 @@ class PowerTaggingCorpusOverviewForm extends FormBase {
       $connection_options = array();
       /* @var $connection \Drupal\semantic_connector\Entity\SemanticConnectorConnection */
       foreach ($connections as $connection) {
-        if ($connection->id() == 'drupal demo poolparty') { continue; }
         $connection_options[$connection->getId()] = $connection->getTitle();
       }
       $form['pp_connections'] = array(
@@ -58,7 +57,6 @@ class PowerTaggingCorpusOverviewForm extends FormBase {
 
       /* @var $connection \Drupal\semantic_connector\Entity\SemanticConnectorConnection */
       foreach ($connections as $connection) {
-        if ($connection->id() == 'drupal demo poolparty') { continue; }
         $projects = $connection->getApi('PPT')->getProjects();
 
         // Get the project options for the currently configured PoolParty server.
