@@ -66,18 +66,14 @@ class PowerTaggingSimilarBlock extends BlockBase {
         $powertagging_similar = new PowerTaggingSimilar($this->config);
 
         // Create the block with the similar contents.
-        $block = array(
-          'content' => array(
-            '#markup' => $powertagging_similar->displayWidget($entity_type, $entity_id),
+        $block['content'] = array(
+          '#markup' => $powertagging_similar->displayWidget($entity_type, $entity_id),
+        );
+
+        $block['#contextual_links'] = array(
+          'powertagging_similar' => array(
+            'route_parameters' => array('powertagging_similar' => $this->config->id()),
           ),
-          '#contextual_links' => array(
-            'powertagging_similar' => array(
-              'route_parameters' => array('powertagging_similar' => $this->config->id()),
-            ),
-          ),
-          '#cache' => array(
-            'max-age' => 0
-          )
         );
       }
     }
