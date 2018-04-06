@@ -46,6 +46,7 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
         '#value' => $powertagging->getTitle(),
       ];
     }
+    $settings = $powertagging->getConfig();
 
     $connection_overides = \Drupal::config('semantic_connector.settings')->get('override_connections');
     $overridden_values = [];
@@ -174,7 +175,7 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
       '#value' => t('Load projects'),
       '#ajax' => [
         'callback' => '::getProjects',
-        'wrapper' => 'projects-replace',
+        'wrapper' => 'replace-selection-area',
         'progress' => [
           'type' => 'throbber',
           'message' => t('Loading projects...'),
@@ -187,16 +188,46 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
       '#type' => 'fieldset',
       '#title' => t('3. Select a project'),
       '#description' => t('Note: In case this list is still empty after clicking the "Load projects" button make sure that a connection to the PoolParty server can be established and check the rights of your selected user inside PoolParty.'),
+      '#prefix' => '<div id="replace-selection-area">',
     ];
 
     // Get the project options for the currently configured PoolParty server.
+    $connection = NULL;
+    if($form_state->hasValue('url') && UrlHelper::isValid($form_state->getValue('url'), TRUE)) {
+      // Create a new connection (without saving) with the current form data.
+      $connection = SemanticConnector::getConnection('pp_server');
+      $connection->setUrl($form_state->getValue('url'));
+      $connection->setCredentials(array(
+        'username' => $form_state->getValue('username'),
+        'password' => $form_state->getValue('password'),
+      ));
+    }
+    elseif (!$powertagging->isNew()) {
+      $connection = $powertagging->getConnection();
+    }
+
+    // Get the project options for the currently configured PoolParty server.
+    $projects = [];
+    if (!is_null($connection)) {
+      $projects = $connection->getApi('PPX')->getProjects();
+    }
+
     $project_options = array();
+    foreach ($projects as $project) {
+      $project_options[$project['uuid']] = $project['label'];
+    }
+    if (!empty($project_options) && $form_state->hasValue('project') && !isset($project_options[$form_state->getValue('project')])) {
+      $form_state->setValue('project', key($project_options));
+    }
+
+    // Get the project options for the currently configured PoolParty server.
+    /*$project_options = array();
     if (!$powertagging->isNew()) {
       $projects = $connection->getApi('PPX')->getProjects();
       foreach ($projects as $project) {
         $project_options[$project['uuid']] = $project['label'];
       }
-    }
+    }*/
     $form['project_select']['project'] = [
       '#type' => 'select',
       '#title' => t('Select a project'),
@@ -206,10 +237,58 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
       '#default_value' => (!$powertagging->isNew() ? $powertagging->getProjectId() : NULL),
       '#required' => TRUE,
       '#validated' => TRUE,
+      '#ajax' => array(
+        'callback' => '::getConceptSchemes',
+        'wrapper' => 'concept-schemes-replace',
+        'method' => 'replace',
+        'effect' => 'fade',
+      ),
     ];
     if (isset($overridden_values['project_id'])) {
       $form['project_select']['project']['#description'] = '<span class="semantic-connector-overridden-value">' . t('Warning: overridden by variable') . '</span>';
     }
+
+    // Container: Project selection.
+    $form['further_restrictions'] = array(
+      '#type' => 'details',
+      '#title' => t('4. Further restrictions'),
+      '#description' => t('Note: A project has to be selected before any further restriction can be added.') . '<br />' . t('The restriction on the concept scheme level requires at least PoolParty version 6.2 to work properly.'),
+      '#open' => FALSE,
+      '#suffix' => '</div>',
+    );
+
+    // Get the concept scheme options for the currently configured PoolParty server.
+    $concept_schemes = [];
+    if (!is_null($connection)) {
+      if ($form_state->hasValue('url')) {
+        $project_id = $form_state->hasValue('project') && !empty($project_options) && isset($project_options[$form_state->getValue('project')]) ? $form_state->getValue('project') : '';
+      }
+      else {
+        $project_id = $powertagging->getProjectId();
+      }
+
+      if (!empty($project_id)) {
+        $concept_schemes = $connection->getApi('PPT')
+          ->getConceptSchemes($project_id);
+      }
+    }
+
+    $concept_scheme_options = array();
+    foreach ($concept_schemes as $concept_scheme) {
+      $concept_scheme_options[$concept_scheme['uri']] = $concept_scheme['title'];
+    }
+
+    // configuration set admin page.
+    $form['further_restrictions']['concept_scheme_restriction'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Filter by concept scheme'),
+      '#description' => t('All concept schemes will be used if no checkbox is selected'),
+      '#prefix' => '<div id="concept-schemes-replace">',
+      '#suffix' => '</div>',
+      '#options' => $concept_scheme_options,
+      '#default_value' => (!$powertagging->isNew() && isset($settings['concept_scheme_restriction']) ? $settings['concept_scheme_restriction'] : []),
+      '#validated' => TRUE,
+    );
 
     $form['#attached'] = [
       'library' => [
@@ -227,26 +306,54 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
     // Only do project validation during the save-operation, not during
     // AJAX-requests like the health check of the server.
     $triggering_element = $form_state->getTriggeringElement();
-    if ($triggering_element['#parents'][0] == 'save') {
-      if (isset($form_state['values']['url']) && UrlHelper::isValid($form_state->getValue('url'), TRUE)) {
-        // Create a new connection (without saving) with the current form data.
-        $connection = SemanticConnector::getConnection('pp_server');
-        $connection->setUrl($form_state->getValue('url'));
-        $connection->setCredentials([
-          'username' => $form_state->getValue('username'),
-          'password' => $form_state->getValue('password'),
-        ]);
+    if ($triggering_element['#parents'][0] == 'submit') {
+      // A project needs to be selected.
+      if (empty($form_state->getValue('project'))) {
+        $form_state->setErrorByName('project', t('Please select a project.'));
+      }
+      else {
+        if ($form_state->hasValue('url') && UrlHelper::isValid($form_state->getValue('url'), TRUE)) {
+          // Create a new connection (without saving) with the current form data.
+          $connection = SemanticConnector::getConnection('pp_server');
+          $connection->setUrl($form_state->getValue('url'));
+          $connection->setCredentials([
+            'username' => $form_state->getValue('username'),
+            'password' => $form_state->getValue('password'),
+          ]);
 
-        $projects = $connection->getApi('PPX')->getProjects();
-        $project_is_valid = FALSE;
-        foreach ($projects as $project) {
-          if ($project['uuid'] == $form_state->getValue('project')) {
-            $project_is_valid = TRUE;
-            break;
+          $projects = $connection->getApi('PPX')->getProjects();
+          $project_is_valid = FALSE;
+          foreach ($projects as $project) {
+            if ($project['uuid'] == $form_state->getValue('project')) {
+              $project_is_valid = TRUE;
+              break;
+            }
           }
-        }
-        if (!$project_is_valid) {
-          $form_state->setErrorByName('project', t('The selected project is not available on the given PoolParty server.'));
+          if ($project_is_valid) {
+            // Check if the selected concept schemes are available for this project.
+            $concept_scheme_values = array_filter($form_state->getValue('concept_scheme_restriction'));
+            if (!empty($concept_scheme_values)) {
+              $concept_schemes = $connection->getApi('PPT')
+                ->getConceptSchemes($form_state->getValue('project'));
+              foreach ($concept_scheme_values as $concept_scheme_value) {
+                $concept_scheme_exists = FALSE;
+                foreach ($concept_schemes as $concept_scheme) {
+                  if ($concept_scheme['uri'] == $concept_scheme_value) {
+                    $concept_scheme_exists = TRUE;
+                    break;
+                  }
+                }
+
+                if (!$concept_scheme_exists) {
+                  $form_state->setErrorByName('concept_scheme_restriction', t('At least one invalid concept scheme has been selected.'));
+                  break;
+                }
+              }
+            }
+          }
+          else {
+            $form_state->setErrorByName('project', t('The selected project is not available on the given PoolParty server.'));
+          }
         }
       }
     }
@@ -265,11 +372,18 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
       'username' => $form_state->getValue('username'),
       'password' => $form_state->getValue('password'),
     ]);
+    $concept_scheme_values = array_values(array_filter($form_state->getValue('concept_scheme_restriction')));
+
     if ($powertagging->isNew()) {
       $powertagging->set('id', SemanticConnector::createUniqueEntityMachineName('powertagging', $powertagging->getTitle()));
     }
     $powertagging->set('connection_id', $connection->getId());
     $powertagging->set('project_id', $form_state->getValue('project'));
+
+    // Add config changes.
+    $settings = $powertagging->getConfig();
+    $settings['concept_scheme_restriction'] = $concept_scheme_values;
+    $powertagging->setConfig($settings);
 
     $status = $powertagging->save();
     switch ($status) {
@@ -340,7 +454,12 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
    *   PoolParty server.
    */
   public function getProjects(array &$form, FormStateInterface $form_state) {
-    $projects_element = $form['project_select']['project'];
+    $replaced_form = [];
+    $replaced_form['project_select'] = $form['project_select'];
+    $replaced_form['further_restrictions'] = $form['further_restrictions'];
+    return $replaced_form;
+
+    /*$projects_element = $form['project_select']['project'];
 
     $project_options = [];
     if (!empty($form_state->getValue('url')) && UrlHelper::isValid($form_state->getValue('url'), TRUE)) {
@@ -359,6 +478,23 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
     }
 
     $projects_element['#options'] = $project_options;
-    return $projects_element;
+    return $projects_element;*/
+  }
+
+  /**
+   * Ajax callback function to get a concept schemes select list for a given
+   * PoolParty server connection + project.
+   *
+   * @param array $form
+   *   The form array.
+   * @param FormStateInterface $form_state
+   *   The form_state object.
+   *
+   * @return array
+   *   The select form element containing the concept scheme options for the
+   *   currently selected project.
+   */
+  public function getConceptSchemes(&$form, FormStateInterface $form_state) {
+    return $form['further_restrictions']['concept_scheme_restriction'];
   }
 }

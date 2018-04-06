@@ -81,6 +81,9 @@ class PowerTagging {
     if (!empty($settings['use_shadow_concepts']) && $project_config['mode'] == 'annotation') {
       $param['shadowConceptCorpusId'] = $corpus_id;
     }
+    if (!empty($settings['concept_scheme_restriction'])) {
+      $param['conceptSchemeFilters'] = $settings['concept_scheme_restriction'];
+    }
 
     $tags = [
       'content' => [

@@ -368,6 +368,7 @@ class PowerTaggingTagsWidget extends WidgetBase {
         'freeterms_threshold' => $limits['freeterms_threshold'],
         'custom_freeterms' => ($powertagging_config['project']['mode'] == 'annotation' ? (!is_null($field->getSetting('custom_freeterms')) ? $field->getSetting('custom_freeterms') : TRUE) : FALSE),
         'use_shadow_concepts' => ($powertagging_config['project']['mode'] == 'annotation' ? (!is_null($field->getSetting('use_shadow_concepts')) ? $field->getSetting('use_shadow_concepts') : FALSE) : FALSE),
+        'concept_scheme_restriction' => (isset($powertagging_config['concept_scheme_restriction']) ? $powertagging_config['concept_scheme_restriction'] : []),
         'entity_language' => $langcode,
         'allowed_languages' => $allowed_langcodes,
         'corpus_id' => $powertagging_config['project']['corpus_id'],
