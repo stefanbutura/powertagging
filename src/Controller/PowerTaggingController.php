@@ -60,6 +60,7 @@ class PowerTaggingController extends ControllerBase implements ContainerInjectio
   public function extract($powertagging_config) {
     $content = isset($_POST['content']) ? $_POST['content'] : '';
     $files = isset($_POST['files']) ? $_POST['files'] : [];
+    $entities = !empty($_POST['entities']) ? $_POST['entities'] : array();
     $settings = $_POST['settings'];
     $tags = array();
 
@@ -69,7 +70,7 @@ class PowerTaggingController extends ControllerBase implements ContainerInjectio
 
     try {
       $powertagging = new PowerTagging($powertagging_config);
-      $powertagging->extract($content, $files, $settings);
+      $powertagging->extract($content, $files, $entities, $settings);
       $tags = $powertagging->getResult();
 
       if (empty($tags['messages']) && empty($tags['suggestion']['concepts']) && empty($tags['suggestion']['freeterms'])) {

@@ -360,6 +360,9 @@ class PowerTaggingTagsWidget extends WidgetBase {
       'fields' => $this->getSelectedTaggingFields($field),
       'settings' => [
         'field_name' => $field->getName(),
+        'entity_type' => $field->getTargetEntityTypeId(),
+        'bundle' => $field->getTargetBundle(),
+        'use_fields' => array_keys(array_filter($field_settings['fields'])),
         'powertagging_id' => $field_settings['powertagging_id'],
         'taxonomy_id' => $powertagging_config['project']['taxonomy_id'],
         'concepts_per_extraction' => $limits['concepts_per_extraction'],
@@ -369,6 +372,7 @@ class PowerTaggingTagsWidget extends WidgetBase {
         'custom_freeterms' => ($powertagging_config['project']['mode'] == 'annotation' ? (!is_null($field->getSetting('custom_freeterms')) ? $field->getSetting('custom_freeterms') : TRUE) : FALSE),
         'use_shadow_concepts' => ($powertagging_config['project']['mode'] == 'annotation' ? (!is_null($field->getSetting('use_shadow_concepts')) ? $field->getSetting('use_shadow_concepts') : FALSE) : FALSE),
         'concept_scheme_restriction' => (isset($powertagging_config['concept_scheme_restriction']) ? $powertagging_config['concept_scheme_restriction'] : []),
+        'data_properties' => $powertagging_config['data_properties'],
         'entity_language' => $langcode,
         'allowed_languages' => $allowed_langcodes,
         'corpus_id' => $powertagging_config['project']['corpus_id'],
@@ -398,11 +402,11 @@ class PowerTaggingTagsWidget extends WidgetBase {
     $supported_fields = [];
 
     $field_settings = $this->getFieldSettings();
-    $selected_fields = $field_settings['fields'];
+    $selected_fields = array_filter($field_settings['fields']);
 
     switch ($field->getTargetEntityTypeId()) {
       case 'node':
-        if (isset($selected_fields['title']) && $selected_fields['title']) {
+        if (isset($selected_fields['title'])) {
           $supported_fields[] = [
             'field_name' => 'title',
             'module' => 'core',
@@ -412,14 +416,14 @@ class PowerTaggingTagsWidget extends WidgetBase {
         break;
 
       case 'taxonomy_term':
-        if (isset($selected_fields['name']) && $selected_fields['name']) {
+        if (isset($selected_fields['name'])) {
           $supported_fields[] = [
             'field_name' => 'name',
             'module' => 'core',
             'widget' => 'string_textfield',
           ];
         }
-        if (isset($selected_fields['description']) && $selected_fields['description']) {
+        if (isset($selected_fields['description'])) {
           $supported_fields[] = [
             'field_name' => 'description',
             'module' => 'text',
@@ -429,20 +433,43 @@ class PowerTaggingTagsWidget extends WidgetBase {
         break;
     }
 
+    // Get the form display to check which widgets are used.
+    $form_display = \Drupal::entityTypeManager()
+      ->getStorage('entity_form_display')
+      ->load($field->getTargetEntityTypeId() . '.' . $field->getTargetBundle() . '.' . 'default');
+
     foreach ($field_definitions as $field_definition) {
       if (!$field_definition instanceof FieldConfig) {
         continue;
       }
       $field_storage = $field_definition->getFieldStorageDefinition();
       $field_name = $field_definition->getName();
-      if (isset($supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()]) &&
-        isset($selected_fields[$field_name]) && $selected_fields[$field_name]
-      ) {
-        $supported_fields[] = [
-          'field_name' => $field_name,
-          'module' => $field_storage->getTypeProvider(),
-          'widget' => $supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()],
-        ];
+      $specific_widget_type = $form_display->getComponent($field_definition->getName());
+      if (isset($supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()]) && in_array($specific_widget_type['type'], $supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()])) {
+        $add_field = FALSE;
+        // A normal field.
+        if ($field_storage->getType() !== 'entity_reference') {
+          if (in_array($field_name, $selected_fields)) {
+            $add_field = TRUE;
+          }
+        }
+        // A referenced entity.
+        else {
+          foreach ($selected_fields as $selected_field) {
+            if (strpos($selected_field, $field_name . '|') === 0) {
+              $add_field = TRUE;
+              break;
+            }
+          }
+        }
+
+        if ($add_field) {
+          $supported_fields[] = [
+            'field_name' => $field_name,
+            'module' => $field_storage->getTypeProvider(),
+            'widget' => $specific_widget_type['type'],
+          ];
+        }
       }
     }
 

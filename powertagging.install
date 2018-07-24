@@ -1,0 +1,23 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the PowerTagging module.
+ */
+
+/**
+ * Adds the new data properties settings to all PowerTagging configurations.
+ */
+function powertagging_update_8101() {
+
+  $configs = \Drupal\powertagging\Entity\PowerTaggingConfig::loadMultiple();
+  /** @var \Drupal\powertagging\Entity\PowerTaggingConfig $config */
+  foreach ($configs as $config) {
+    $settings = $config->getConfig();
+    $settings['data_properties'] = ['skos:altLabel', 'skos:hiddenLabel', 'skos:exactMatch'];
+    $config->setConfig($settings);
+    $config->save();
+  }
+
+  return t('PowerTagging configurations updated.');
+}

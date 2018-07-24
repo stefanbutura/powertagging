@@ -238,6 +238,28 @@ class PowerTaggingConfigForm extends EntityForm {
       );
     }
 
+    // Tab: Data fetching settings.
+    $properties = array(
+      'skos:altLabel' => t('Alternative labels'),
+      'skos:hiddenLabel' => t('Hidden labels'),
+      'skos:scopeNote' => t('Scope notes'),
+      'skos:related' => t('Related concepts'),
+      'skos:exactMatch' => t('Exact matches'),
+    );
+    $form['data_properties_settings'] = array(
+      '#type' => 'details',
+      '#title' => t('Additional data'),
+      '#group' => 'settings',
+    );
+
+    $form['data_properties_settings']['data_properties'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Select the properties that will be saved in addition to the taxonomy terms during the PowerTagging process'),
+      '#description' => t('If you clear a checkbox, all data of that property will be deleted from the associated vocabulary.'),
+      '#options' => $properties,
+      '#default_value' => $config['data_properties'],
+    );
+
     // Tab: Batch Jobs.
     $form['batch_jobs'] = array(
       '#type' => 'details',
@@ -286,6 +308,11 @@ class PowerTaggingConfigForm extends EntityForm {
       '#tableselect' => FALSE,
     ];
 
+    $form['concept_scheme_restriction'] = array(
+      '#type' => 'value',
+      '#value' => $config['concept_scheme_restriction'],
+    );
+
     // Attach the libraries for the slider element.
     $form['#attached'] = [
       'library' => [
@@ -316,8 +343,35 @@ class PowerTaggingConfigForm extends EntityForm {
         'concepts_threshold' => $values['concepts_threshold'],
         'freeterms_per_extraction' => $values['freeterms_per_extraction'],
         'freeterms_threshold' => $values['freeterms_threshold'],
-      ]
+      ],
+      'concept_scheme_restriction' => $values['concept_scheme_restriction'],
     ];
+
+    // Get the data properties for data fetching process.
+    $config['data_properties'] = array_values(array_filter($values['data_properties']));
+
+    // Delete the data for deselected properties
+    $clear_fields = array_diff($form['data_properties_settings']['data_properties']['#default_value'], $config['data_properties']);
+    if (!empty($clear_fields)) {
+      $properties = array(
+        'skos:altLabel' => 'field_alt_labels',
+        'skos:hiddenLabel' => 'field_hidden_labels',
+        'skos:scopeNote' => 'field_scope_notes',
+        'skos:related' => 'field_related_concepts',
+        'skos:exactMatch' => 'field_exact_match',
+      );
+      foreach ($clear_fields as $field) {
+        $table = 'taxonomy_term__' . $properties[$field];
+        \Drupal::database()->query('DELETE f
+        FROM {' . $table . '} f
+        LEFT JOIN {taxonomy_term_data} t ON f.entity_id = t.tid
+        WHERE (
+          t.vid = :vid
+        )', [':vid' => $values['project_settings']['taxonomy_id']]);
+      }
+      drupal_flush_all_caches();
+    }
+
     $powertagging_config->set('config', $config);
 
     // Set the vocabulary.
@@ -544,6 +598,36 @@ class PowerTaggingConfigForm extends EntityForm {
           'weight' => 5,
         ],
       ],
+      'field_scope_notes' => [
+        'field_name' => 'field_scope_notes',
+        'type' => 'text_long',
+        'label' => t('Scope notes'),
+        'description' => t('Information about the scope of a concept'),
+        'cardinality' => -1,
+        'field_settings' => [],
+        'required' => FALSE,
+        'instance_settings' => [],
+        'widget' => [
+          'type' => 'string_textarea',
+          'weight' => 6,
+        ],
+      ],
+      'field_related_concepts' => [
+        'field_name' => 'field_related_concepts',
+        'type' => 'text',
+        'label' => t('Related concepts'),
+        'description' => t('URIs to related concepts'),
+        'cardinality' => -1,
+        'field_settings' => [
+          'max_length' => 1024,
+        ],
+        'required' => FALSE,
+        'instance_settings' => [],
+        'widget' => [
+          'type' => 'text_textfield',
+          'weight' => 7,
+        ],
+      ],
       'field_exact_match' => [
         'field_name' => 'field_exact_match',
         'type' => 'link',
@@ -558,7 +642,7 @@ class PowerTaggingConfigForm extends EntityForm {
         ],
         'widget' => [
           'type' => 'link_default',
-          'weight' => 6,
+          'weight' => 8,
         ],
       ],
     ];

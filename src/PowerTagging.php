@@ -59,6 +59,8 @@ class PowerTagging {
    *   The text content to extract tags from.
    * @param array $files
    *   Array of Drupal file IDs of files to extract tags from.
+   * @param array $entities
+   *   Associative array of referenced entity IDs keyed by field name.
    * @param array $settings
    *   Array of settings to use for the extraction process.
    *
@@ -67,9 +69,79 @@ class PowerTagging {
    *
    * @throws \Exception
    */
-  public function extract($content, array $files, array $settings) {
+  public function extract($content, array $files = [], array $entities = [], array $settings = []) {
     $project_config = $this->config_settings['project'];
     $corpus_id = !empty($project_config['corpus_id']) ? $project_config['corpus_id'] : '';
+
+    if (!empty($entities)) {
+      foreach ($entities as $field_name => $entity_ids) {
+        if (!empty($entity_ids)) {
+          $field_info = FieldConfig::loadByName($settings['entity_type'], $settings['bundle'], $field_name);
+
+          $allowed_entity_types = ['node', 'taxonomy_term', 'user'];
+          $ref_field_settings = $field_info->getSettings();
+          $ref_entity_type = $ref_field_settings['target_type'];
+          if (in_array($ref_entity_type, $allowed_entity_types)) {
+            $allowed_bundles = ($ref_entity_type !== 'user') ? array_values(array_filter($ref_field_settings['handler_settings']['target_bundles'])) : ['user'];
+            $tag_fields = [];
+            foreach ($allowed_bundles as $allowed_bundle) {
+              // Get the list of fields to fetch tags from for referenced
+              // entities.
+              $fields_to_use = [];
+              $prefix = $field_name . '|' . $allowed_bundle . '|';
+              foreach ($settings['use_fields'] as $field_id) {
+                if (strpos($field_id, $prefix) === 0) {
+                  $fields_to_use[] = substr($field_id, strlen($prefix));
+                }
+              }
+
+              if (!empty($fields_to_use)) {
+                $field_definitions = \Drupal::service('entity_field.manager')
+                  ->getFieldDefinitions($ref_entity_type, $allowed_bundle);
+
+                // Get the form display to check which widgets are used.
+                $form_display = \Drupal::entityTypeManager()
+                  ->getStorage('entity_form_display')
+                  ->load($ref_entity_type . '.' . $allowed_bundle . '.' . 'default');
+
+                foreach ($fields_to_use as $tag_field_name) {
+                  /** @var \Drupal\Core\Field\FieldDefinitionInterface $field_definition */
+                  $field_definition = $field_definitions[$tag_field_name];
+                  $specific_widget_type = $form_display->getComponent($field_definition->getName());
+
+                  if (!$field_definition instanceof FieldConfig) {
+                    $tag_fields[$allowed_bundle][$tag_field_name] = array(
+                      'module' => 'core',
+                      'widget' => $specific_widget_type['type'],
+                    );
+                  }
+                  else {
+                    $field_storage = $field_definition->getFieldStorageDefinition();
+                    $tag_fields[$allowed_bundle][$tag_field_name] = array(
+                      'module' => $field_storage->getTypeProvider(),
+                      'widget' => $specific_widget_type['type'],
+                    );
+                  }
+                }
+              }
+            }
+
+            $loaded_entities = \Drupal::entityTypeManager()->getStorage($ref_entity_type)->loadMultiple($entity_ids);
+            foreach ($loaded_entities as $loaded_entity) {
+              if ($ref_entity_type != 'node' || $loaded_entity->access('view')) {
+                $ref_bundle = $loaded_entity->bundle();
+                if (isset($tag_fields[$ref_bundle]) && !empty($tag_fields[$ref_bundle])) {
+                  $tag_contents = $this->extractEntityContent($loaded_entity, $tag_fields[$ref_bundle]);
+                  if (isset($tag_contents['text']) && !empty($tag_contents['text'])) {
+                    $content .= ' ' . $tag_contents['text'];
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
 
     $param = [
       'projectId' => $this->config->getProjectId(),
@@ -407,8 +479,23 @@ class PowerTagging {
 
     // Get the concepts for the entity.
     $tag_settings['entity_language'] = $entity->language()->getId();
-    $this->extract(implode(' ', $tag_contents['text']), $tag_contents['file_ids'], $tag_settings);
-    $extraction_result = $this->getResult();
+    try {
+      $this->extract($tag_contents['text'], $tag_contents['file_ids'], $tag_contents['entities'], $tag_settings);
+      $extraction_result = $this->getResult();
+    }
+    catch (\Exception $e) {
+      $extraction_result = [
+        'content' => [
+          'concepts' => [],
+          'freeterms' => [],
+        ],
+        'suggestion' => [
+          'concepts' => [],
+          'freeterms' => [],
+        ],
+        'messages' => [],
+      ];
+    }
 
     // Add already existing terms from default tags field if required.
     if (!empty($tag_settings['default_tags_field']) &&
@@ -492,6 +579,7 @@ class PowerTagging {
     $entity_content = array(
       'text' => '',
       'file_ids' => array(),
+      'entities' => [],
     );
     $text_parts = [];
     foreach ($fields as $tag_field_name => $tag_type) {
@@ -504,9 +592,21 @@ class PowerTagging {
       foreach ($entity->get($tag_field_name)->getValue() as $value) {
         switch ($tag_type['module']) {
           case 'core':
-            $tag_content = trim(strip_tags($value['value']));
-            if (!empty($tag_content)) {
-              $text_parts[] = $tag_content;
+            // Normal core field.
+            if ($tag_type['widget'] !== 'entity_reference_autocomplete' && $tag_type['widget'] !== 'entity_reference_autocomplete_tags') {
+              $tag_content = trim(strip_tags($value['value']));
+              if (!empty($tag_content)) {
+                $text_parts[] = $tag_content;
+              }
+            }
+            // Entity reference field.
+            else {
+              if (isset($value['target_id'])) {
+                if (!isset($entity_content['entities'][$tag_field_name])) {
+                  $entity_content['entities'][$tag_field_name] = [];
+                }
+                $entity_content['entities'][$tag_field_name][] = $value['target_id'];
+              }
             }
             break;
 
@@ -680,15 +780,12 @@ class PowerTagging {
    *   An array of concept detail information.
    */
   public function getConceptsDetails(array $uris, $langcode = '') {
+    $properties = $this->config_settings['data_properties'];
+    $properties[] = 'skos:prefLabel';
+    $properties[] = 'skos:definition';
     $concepts = $this->config->getConnection()
       ->getApi('PPT')
-      ->getConcepts($this->config->getProjectId(), $uris, [
-        'skos:prefLabel',
-        'skos:altLabel',
-        'skos:hiddenLabel',
-        'skos:definition',
-        'skos:exactMatch',
-      ], $langcode);
+      ->getConcepts($this->config->getProjectId(), $uris, $properties, $langcode);
 
     return $concepts;
   }
@@ -705,92 +802,70 @@ class PowerTagging {
    *   TRUE if data has changed, FALSE if everything was up to date already.
    */
   public function updateTaxonomyTermDetails(Term &$term, $concept_details) {
-    $data_has_changed = FALSE;
+    $term_serialized = serialize($term);
 
     // Set the taxonomy name.
     if (!empty($concept_details->prefLabel)) {
-      if ($term->getName() != $concept_details->prefLabel) {
-        $data_has_changed = TRUE;
-        $term->setName($concept_details->prefLabel);
-      }
+      $term->setName($concept_details->prefLabel);
     }
 
     // Set the URI.
     if (!empty($concept_details->uri)) {
-      if ($term->get('field_uri')->getString() != $concept_details->uri) {
-        $data_has_changed = TRUE;
-        $term->get('field_uri')->setValue($concept_details->uri);
-      }
+      $term->get('field_uri')->setValue($concept_details->uri);
     }
 
     // Set the description.
-    $term_description = $term->getDescription();
-    if (!empty($concept_details->definitions)) {
+    if (isset($concept_details->definitions) && !empty($concept_details->definitions)) {
       $description = '<p>' . implode('</p><p>', $concept_details->definitions) . '</p>';
-      if ($term_description != $description) {
-        $data_has_changed = TRUE;
-        $term->setDescription($description);
-      }
+      $term->setDescription($description);
     }
-    elseif (!empty($term_description)) {
-        $data_has_changed = TRUE;
-        $term->setDescription('');
+    else {
+      $term->setDescription('');
     }
 
     // Set alternative labels.
-    $term_alt_labels = $term->get('field_alt_labels')->getString();
-    if (!empty($concept_details->altLabels)) {
+    if (isset($concept_details->altLabels)) {
       $alt_labels = implode(',', $concept_details->altLabels);
-      if ($term_alt_labels != $alt_labels) {
-        $data_has_changed = TRUE;
-        $term->get('field_alt_labels')->setValue($alt_labels);
-      }
     }
-    elseif (!empty($term_alt_labels)) {
-        $data_has_changed = TRUE;
-        $term->get('field_alt_labels')->setValue('');
+    else {
+      $alt_labels = '';
     }
+    $term->get('field_alt_labels')->setValue($alt_labels);
 
     // Set hidden labels.
-    $term_hidden_labels = $term->get('field_hidden_labels')->getString();
     if (isset($concept_details->hiddenLabels)) {
       $hidden_labels = implode(',', $concept_details->hiddenLabels);
-      if ($term_hidden_labels != $hidden_labels) {
-        $data_has_changed = TRUE;
-        $term->get('field_hidden_labels')->setValue($hidden_labels);
-      }
     }
-    elseif (!empty($term_hidden_labels)) {
-        $data_has_changed = TRUE;
-        $term->get('field_hidden_labels')->setValue('');
+    else {
+      $hidden_labels = '';
+    }
+    $term->get('field_hidden_labels')->setValue($hidden_labels);
+
+    // Set the scope notes.
+    if (isset($concept_details->scopeNotes) && !empty($concept_details->scopeNotes)) {
+      $term->get('field_scope_notes')->setValue($concept_details->scopeNotes);
+    }
+    else {
+      $term->get('field_scope_notes')->setValue(NULL);
+    }
+
+    // Set the related concepts.
+    if (isset($concept_details->relateds) && !empty($concept_details->relateds)) {
+      $term->get('field_related_concepts')->setValue($concept_details->relateds);
+    }
+    else {
+      $term->get('field_related_concepts')->setValue(NULL);
     }
 
     // Set exact match values.
-    if (!empty($concept_details->exactMatch)) {
-      $concept_count = count($concept_details->exactMatch);
-      $term_count = $term->get('field_exact_match')->count();
-
-      if ($concept_count != $term_count) {
-        $term->get('field_exact_match')->setValue(NULL);
-      }
-      for ($i = 0; $i < $concept_count; $i++) {
-        if (!$term->get('field_exact_match')->get($i) ||
-          $term->get('field_exact_match')
-            ->get($i)
-            ->getString() != $concept_details->exactMatch[$i]
-        ) {
-          $data_has_changed = TRUE;
-          $term->get('field_exact_match')
-            ->set($i, $concept_details->exactMatch[$i]);
-        }
-      }
+    if (isset($concept_details->exactMatch) && !empty($concept_details->exactMatch)) {
+      $term->get('field_exact_match')->setValue($concept_details->exactMatch);
     }
-    elseif (!empty($term->get('field_exact_match')->getString())) {
-        $data_has_changed = TRUE;
-        $term->get('field_exact_match')->setValue(NULL);
+    else {
+      $term->get('field_exact_match')->setValue(NULL);
     }
 
-    return $data_has_changed;
+    return (serialize($term) != $term_serialized);
   }
 
   /**
@@ -1200,23 +1275,34 @@ class PowerTagging {
     }
 
     $field_settings = $this->config->getFieldSettings($field_info);
-
     $tag_fields = [];
     foreach ($field_settings['fields'] as $tag_field_type) {
-      if ($tag_field_type && !isset($tag_fields[$tag_field_type])) {
-        $info = self::getInfoForTaggingField([
-          'entity_type_id' => $field_info['entity_type_id'],
-          'bundle' => $field_info['bundle'],
-          'field_type' => $tag_field_type,
-        ]);
-        if (!empty($info)) {
-          $tag_fields[$tag_field_type] = $info;
+      if ($tag_field_type) {
+        // Cut down entity reference fields to their field name.
+        $pipe_position = strpos($tag_field_type, '|');
+        if ($pipe_position !== FALSE) {
+          $tag_field_type = substr($tag_field_type, 0, $pipe_position);
+        }
+
+        if (!isset($tag_fields[$tag_field_type])) {
+          $info = self::getInfoForTaggingField([
+            'entity_type_id' => $field_info['entity_type_id'],
+            'bundle' => $field_info['bundle'],
+            'field_type' => $tag_field_type,
+          ]);
+          if (!empty($info)) {
+            $tag_fields[$tag_field_type] = $info;
+          }
         }
       }
     }
 
     // Build the tag settings array.
     $tag_settings = array(
+      'field_name' => $field_info['field_type'],
+      'entity_type' => $field_info['entity_type_id'],
+      'bundle' => $field_info['bundle'],
+      'use_fields' => array_keys(array_filter($field_settings['fields'])),
       'powertagging_id' => $this->config->id(),
       'powertagging_config' => $this->config,
       'taxonomy_id' => $config_settings['project']['taxonomy_id'],
@@ -1224,6 +1310,10 @@ class PowerTagging {
       'concepts_threshold' => $field_settings['limits']['concepts_threshold'],
       'freeterms_per_extraction' => $field_settings['limits']['freeterms_per_extraction'],
       'freeterms_threshold' => $field_settings['limits']['freeterms_threshold'],
+      'custom_freeterms' => ($config_settings['project']['mode'] == 'annotation' ? (isset($field_settings['custom_freeterms']) ? $field_settings['custom_freeterms'] : TRUE) : FALSE),
+      'use_shadow_concepts' => ($config_settings['project']['mode'] == 'annotation' ? (isset($field_settings['use_shadow_concepts']) ? $field_settings['use_shadow_concepts'] : FALSE) : FALSE),
+      'concept_scheme_restriction' => (isset($config_settings['concept_scheme_restriction']) ? $config_settings['concept_scheme_restriction'] : []),
+      'data_properties' => $config_settings['data_properties'],
       'entity_language' => '',
       'allowed_languages' => $allowed_langcodes,
       'fields' => $tag_fields,
@@ -1275,16 +1365,27 @@ class PowerTagging {
     /** @var FieldConfig $field_definition */
     $field_definition = $entityFieldManager->getFieldDefinitions($field['entity_type_id'], $field['bundle'])[$field['field_type']];
 
+    // Basic fields, which were not explicitly defined before can be ignored.
     if (!$field_definition instanceof FieldConfig) {
       return [];
     }
 
+    // Get the form display to check which widgets are used.
+    $form_display = \Drupal::entityTypeManager()
+      ->getStorage('entity_form_display')
+      ->load($field['entity_type_id'] . '.' . $field['bundle'] . '.' . 'default');
+    $specific_widget_type = $form_display->getComponent($field_definition->getName());
+
     $field_storage = $field_definition->getFieldStorageDefinition();
     $supported_field_types = PowerTaggingTagsItem::getSupportedFieldTypes();
 
+    if (!in_array($specific_widget_type['type'], $supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()])) {
+      return [];
+    }
+
     return [
       'module' => $field_storage->getTypeProvider(),
-      'widget' => $supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()],
+      'widget' => $specific_widget_type['type'],
     ];
   }
 

@@ -127,7 +127,7 @@
 }
 
 .field--type-powertagging-tags .form-type-textfield {
-    clear:both;
+    clear: both;
 }
 
 .field--type-powertagging-tags .messages {
@@ -147,4 +147,8 @@
     border-color: #f4daa6 transparent #f4daa6 #f4daa6;
     box-shadow: 8px 0 0 #e09600;
     padding-right: 12px;
+}
+
+.field--widget-powertagging-invisible {
+    display: none;
 }

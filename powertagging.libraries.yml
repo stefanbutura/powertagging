@@ -29,3 +29,9 @@ widget:
     - core/jquery
     - core/jquery.once
     - core/autocomplete
+
+widget_css_only:
+  version: 1.0
+  css:
+    theme:
+      css/powertagging.widget.css: {}

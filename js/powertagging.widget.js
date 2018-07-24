@@ -114,17 +114,29 @@
        */
       function collectContent(pt_field_id) {
         var settings = drupalSettings.powertagging[pt_field_id];
-        var data = {settings: settings.settings, content: "", files: []};
+        var data = {settings: settings.settings, content: "", files: [], entities: {}};
 
         // Build the text content to extract tags from.
         $.each(settings.fields, function (field_index, field) {
           switch (field.module) {
             case "core":
             case "text":
-              var text_content = collectContentText(field.field_name, field.widget);
-              if (text_content.length > 0) {
-                data.content += " " + text_content;
+              // Normal text field
+              if (field.widget !== 'entity_reference_autocomplete' && field.widget !== 'entity_reference_autocomplete_tags') {
+                var text_content = collectContentText(field.field_name, field.widget);
+                if (text_content.length > 0) {
+                  data.content += " " + text_content;
+                }
               }
+              // Entity selection.
+              else {
+                var entites = collectReferencedEntities(field.field_name, field.widget);
+                if (entites.length > 0) {
+                  data.entities[field.field_name] = entites;
+                }
+                break;
+              }
+
               break;
 
             case "media":
@@ -210,10 +222,52 @@
               }
             });
             return files;
-            break;
         }
 
         return files;
+      }
+
+      /**
+       * Collect the selected entities referenced in a entityreference field.
+       */
+      function collectReferencedEntities (field, widget) {
+        var field_id = "#edit-" + field.replace(/_/g, "-") + "-wrapper";
+        var entities = [];
+        switch (widget) {
+          case "entity_reference_autocomplete":
+            $(field_id + " input[type=text]").each(function() {
+              var field_value = $(this).val();
+              if (field_value.length > 0) {
+                var entity_id_start = field_value.lastIndexOf("(");
+                var entity_id_end = field_value.lastIndexOf(")");
+                if (entity_id_start !== -1 && entity_id_end !== -1 && entity_id_end > entity_id_start) {
+                  var entity_id = field_value.substr(entity_id_start + 1,( entity_id_end - entity_id_start) - 1);
+                  if (!isNaN(entity_id) && parseInt(Number(entity_id)) == entity_id && !isNaN(parseInt(entity_id, 10))) {
+                    entities.push(entity_id);
+                  }
+                }
+              }
+            });
+            break;
+
+          case "entity_reference_autocomplete_tags":
+            var field_value = $(field_id + " input[type=text]").val();
+            if (field_value.length > 0) {
+              var all_values = field_value.split(', ');
+              all_values.forEach(function(single_value) {
+                var entity_id_start = single_value.lastIndexOf("(");
+                var entity_id_end = single_value.lastIndexOf(")");
+                if (entity_id_start !== -1 && entity_id_end !== -1 && entity_id_end > entity_id_start) {
+                  var entity_id = single_value.substr(entity_id_start + 1,( entity_id_end - entity_id_start) - 1);
+                  if (!isNaN(entity_id) && parseInt(Number(entity_id)) == entity_id && !isNaN(parseInt(entity_id, 10))) {
+                    entities.push(entity_id);
+                  }
+                }
+              });
+            }
+            break;
+        }
+        return entities;
       }
 
       /**

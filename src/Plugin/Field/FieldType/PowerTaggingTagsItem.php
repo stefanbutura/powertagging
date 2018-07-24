@@ -35,27 +35,38 @@ class PowerTaggingTagsItem extends FieldItemBase {
   /**
    * Returns the list of supported field types for the extraction mechanism.
    *
+   * @param bool $is_sub_entity
+   *   TRUE if the entity already is a referenced entity, FALSE if not.
+   *
    * @return array
    *   The list of supported field types
    */
-  public static function getSupportedFieldTypes() {
-    // ContentEntityType ID => [
-    //   FieldType ID => FieldWidget ID
-    // ]
-    return [
+  public static function getSupportedFieldTypes($is_sub_entity = FALSE) {
+    $allowed_widgets = [
       'core' => [
-        'string' => 'string_textfield',
-        'string_long' => 'string_textarea',
+        'string' => ['string_textfield'],
+        'string_long' => ['string_textarea'],
       ],
       'text' => [
-        'text' => 'text_textfield',
-        'text_long' => 'text_textarea',
-        'text_with_summary' => 'text_textarea_with_summary',
+        'text' => ['text_textfield'],
+        'text_long' => ['text_textarea'],
+        'text_with_summary' => ['text_textarea_with_summary'],
       ],
       'file' => [
-        'file' => 'file_generic',
+        'file' => ['file_generic'],
       ],
     ];
+
+    if (!$is_sub_entity) {
+      $allowed_widgets['core']['entity_reference'] = ['entity_reference_autocomplete', 'entity_reference_autocomplete_tags'];
+      $allowed_widgets = array_merge($allowed_widgets, [
+        'file' => [
+          'file' => ['file_generic'],
+        ],
+      ]);
+    }
+
+    return $allowed_widgets;
   }
 
   /**
@@ -390,15 +401,17 @@ class PowerTaggingTagsItem extends FieldItemBase {
    *   The entity type to check.
    * @param string $bundle
    *   The bundle to check.
+   * @param bool $is_sub_entity
+   *   TRUE if the entity already is a referenced entity, FALSE if not.
    *
    * @return array
    *   A list of supported fields.
    */
-  public static function getSupportedTaggingFields($entity_type, $bundle) {
+  public static function getSupportedTaggingFields($entity_type, $bundle, $is_sub_entity = FALSE) {
     $field_definitions = \Drupal::service('entity_field.manager')
       ->getFieldDefinitions($entity_type, $bundle);
     $widget_manager = \Drupal::service('plugin.manager.field.widget');
-    $supported_field_types = static::getSupportedFieldTypes();
+    $supported_field_types = static::getSupportedFieldTypes($is_sub_entity);
     $supported_fields = [];
 
     switch ($entity_type) {
@@ -411,17 +424,47 @@ class PowerTaggingTagsItem extends FieldItemBase {
         $supported_fields['name'] = t('Name of the term') . '<span class="description">[' . t('Textfield') . ']</span>';
         $supported_fields['description'] = t('Description') . '<span class="description">[' . t('Text area (multiple rows)') . ']</span>';
         break;
+
+      case 'user':
+        $supported_fields['name'] = t('Name of the user') . '<span class="description">[' . t('Textfield') . ']</span>';
+        break;
     }
+
+    // Get the form display to check which widgets are used.
+    $form_display = \Drupal::entityTypeManager()
+      ->getStorage('entity_form_display')
+      ->load($entity_type . '.' . $bundle . '.' . 'default');
+
     /** @var \Drupal\Core\Field\BaseFieldDefinition $field_definition */
     foreach ($field_definitions as $field_definition) {
       if (!$field_definition instanceof FieldConfig) {
         continue;
       }
+
       $field_storage = $field_definition->getFieldStorageDefinition();
-      if (isset($supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()])) {
-        $widget_id = $supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()];
-        $widget_info = $widget_manager->getDefinition($widget_id);
-        $supported_fields[$field_definition->getName()] = $field_definition->label() . '<span class="description">[' . $widget_info['label'] . ']</span>';
+      $specific_widget_type = $form_display->getComponent($field_definition->getName());
+      if (isset($supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()]) && in_array($specific_widget_type['type'], $supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()])) {
+        $widget_info = $widget_manager->getDefinition($specific_widget_type['type']);
+        // A normal field.
+        if ($field_storage->getType() !== 'entity_reference') {
+          $supported_fields[$field_definition->getName()] = $field_definition->label() . '<span class="description">[' . $widget_info['label'] . ']</span>';
+        }
+        // A referenced entity.
+        else {
+          $ref_field_settings = $field_definition->getSettings();
+          $ref_entity_type = $ref_field_settings['target_type'];
+          $ref_bundles = ($ref_entity_type !== 'user') ? array_values(array_filter($ref_field_settings['handler_settings']['target_bundles'])) : ['user'];
+          $allowed_entity_types = ['node', 'taxonomy_term', 'user'];
+          if (in_array($ref_entity_type, $allowed_entity_types)) {
+            foreach ($ref_bundles as $ref_bundle) {
+              $sub_results = self::getSupportedTaggingFields($ref_entity_type, $ref_bundle, TRUE);
+
+              foreach ($sub_results as $field_id => $label) {
+                $supported_fields[$field_definition->getName() . '|' . $ref_bundle . '|' . $field_id] = $field_definition->label() . ' <span class="description">[' . $widget_info['label'] . ']</span> --> ' . $ref_bundle . ' --> ' . $label;
+              }
+            }
+          }
+        }
       }
     }
 

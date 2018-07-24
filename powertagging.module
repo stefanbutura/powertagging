@@ -64,20 +64,45 @@ function powertagging_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $f
  */
 function powertagging_entity_presave($entity) {
   // One of the supported entities is being created at the moment.
-  if ($entity->isNew() && in_array($entity->getEntityTypeId(), array('node', 'user', 'taxonomy_term'))) {
+  if (in_array($entity->getEntityTypeId(), array('node', 'user', 'taxonomy_term'))) {
     $bundle = $entity->bundle();
 
     $field_definitions = \Drupal::service('entity_field.manager')->getFieldDefinitions($entity->getEntityTypeId(), $bundle);
+    // Get the form display to check which widgets are used.
+    $form_display = \Drupal::entityTypeManager()
+      ->getStorage('entity_form_display')
+      ->load($entity->getEntityTypeId() . '.' . $bundle . '.' . 'default');
+
     /** @var \Drupal\field\Entity\FieldConfig $field_definition */
     foreach ($field_definitions as $field_definition) {
       $field_settings = $field_definition->getSettings();
       $field_name = $field_definition->getName();
-      // It is a PowerTagging field with automatic tagging activated.
-      if ($field_definition->getType() == 'powertagging_tags' && isset($field_settings['automatically_tag_new_entities']) && $field_settings['automatically_tag_new_entities']) {
-        // Only go on if the entity doesn't have values for that field yet.
-        if (!$entity->hasField($field_name) || !$entity->get($field_name)->count()) {
+
+      // It is a PowerTagging field.
+      if ($field_definition->getType() == 'powertagging_tags') {
+        $specific_widget_type = $form_display->getComponent($field_definition->getName());
+        $tag_entity = FALSE;
+        switch ($specific_widget_type['type']) {
+          case 'powertagging_tags_default':
+            // Only tag new entities and only if the auto-tag is enabled.
+            if ($entity->isNew() && isset($field_settings['automatically_tag_new_entities']) && $field_settings['automatically_tag_new_entities']) {
+              // Only go on if the entity doesn't have values for that field yet.
+              if (!$entity->hasField($field_name) || !$entity->get($field_name)
+                  ->count()) {
+                $tag_entity = TRUE;
+              }
+            }
+
+            break;
+          case 'powertagging_invisible':
+            $tag_entity = TRUE;
+            break;
+        }
+
+        if ($tag_entity) {
           // Build the tag settings.
-          $powertagging_config = \Drupal\powertagging\Entity\PowerTaggingConfig::load($field_definition->getFieldStorageDefinition()->getSetting('powertagging_id'));
+          $powertagging_config = \Drupal\powertagging\Entity\PowerTaggingConfig::load($field_definition->getFieldStorageDefinition()
+            ->getSetting('powertagging_id'));
           $powertagging = new \Drupal\powertagging\PowerTagging($powertagging_config);
           $tag_settings = $powertagging->buildTagSettings([
             'entity_type_id' => $entity->getEntityTypeId(),
