@@ -118,7 +118,8 @@
     padding: 1px 23px 1px 10px;
 }
 
-.field--type-powertagging-tags .ui-autocomplete-loading.concept {
+.field--type-powertagging-tags .ui-autocomplete-loading.concept,
+.powertagging-browse-tags-area .ui-autocomplete-loading.concept {
     background: url('../images/throbber.gif') no-repeat scroll right -18px transparent;
 }
 
@@ -126,7 +127,8 @@
     padding-left: 20px;
 }
 
-.field--type-powertagging-tags .form-type-textfield {
+.field--type-powertagging-tags .form-type-textfield,
+.field--type-powertagging-tags .form-type-item {
     clear: both;
 }
 
@@ -147,6 +149,88 @@
     border-color: #f4daa6 transparent #f4daa6 #f4daa6;
     box-shadow: 8px 0 0 #e09600;
     padding-right: 12px;
+}
+
+.powertagging-browse-tags-vm {
+    clear: both;
+}
+
+.powertagging-browse-tags-vm .chart-header .button {
+    float: right;
+}
+
+.powertagging-browse-tags-vm .chart-header .button a,
+.powertagging-browse-tags-vm .chart-header .button a:link,
+.powertagging-browse-tags-vm .chart-header .button a:visited,
+.powertagging-browse-tags-vm .chart-header .button a:hover,
+.powertagging-browse-tags-vm .chart-header .button a:focus,
+.powertagging-browse-tags-vm .chart-header .button a:active {
+    background: #0099CC;
+    border-radius: 12px;
+    -webkit-border-radius: 12px;
+    -moz-border-radius: 12px;
+    color: #fff;
+    cursor: pointer;
+    display: block;
+    height: auto;
+    line-height: 2.1em;
+    margin: 0;
+    padding: 0.2em 1em 0;
+    position: relative;
+    text-align: center;
+    text-transform: uppercase;
+    width: auto;
+    font-size: 10px;
+}
+
+.powertagging-browse-tags-vm .chart-header .button a:hover{
+    text-decoration: none;
+    background:#0285B1;
+}
+
+.powertagging-browse-tags-vm .chart-header .button .powertagging-browse-tags-add-concept.active {
+    background: #0099CC;
+    color:#fff;
+}
+
+.powertagging-browse-tags-search{
+    float:left;
+}
+.powertagging-browse-tags-search input.form-text{
+    width: 300px;
+    padding: 0.3em 0.5em;
+    font-size: 14px;
+}
+
+.powertagging-browse-tags-selection{
+    border: 1px solid #ddd;
+    padding: 0 15px 15px;
+    float: right;
+    background: #f6f6f2;
+    width: 450px;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+    border-radius: 5px;
+}
+.powertagging-browse-tags-selection > p{
+    font-weight: bold;
+}
+
+.powertagging-browse-tags-selection .powertagging-browse-tags-tag{
+    background: url("../images/remove11.svg") top 6px right 4px no-repeat #c3e2f7;
+    background-size:18px auto;
+    padding: 1px 23px 1px 10px;
+    border-radius: 5px;
+    font-size: 88%;
+    color: #5c5c5c;
+    margin: 0 5px 8px 0;
+    display: inline-block;
+    cursor:pointer;
+}
+
+.powertagging-browse-tags-selection .powertagging-browse-tags-tag:hover,
+.powertagging-browse-tags-selection .powertagging-browse-tags-tag:focus{
+    background-color: #ccc;
 }
 
 .field--widget-powertagging-invisible {

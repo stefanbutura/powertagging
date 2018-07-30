@@ -18,6 +18,7 @@ use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
 use Drupal\powertagging\Form\PowerTaggingConfigForm;
 use Drupal\powertagging\PowerTagging;
+use Drupal\semantic_connector\SemanticConnector;
 
 /**
  * Plugin implementation of the 'powertagging_tags' field type.
@@ -190,6 +191,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
         'automatically_tag_new_entities' => FALSE,
         'custom_freeterms' => TRUE,
         'use_shadow_concepts' => FALSE,
+        'browse_concepts_charttypes' => [],
         'fields' => [],
         'default_tags_field' => '',
         'limits' => [],
@@ -270,7 +272,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
     // Limit settings.
     $form['limits'] = [
       '#type' => 'details',
-      '#title' => t('Threshold settings for concepts / categories and free terms'),
+      '#title' => t('Settings for concepts / categories and free terms'),
       '#open' => FALSE,
     ];
 
@@ -294,14 +296,33 @@ class PowerTaggingTagsItem extends FieldItemBase {
       $form['limits']['freeterms']['#access'] = FALSE;
     }
 
-    if ($powertagging_mode == 'annotation' && !empty($powertagging_corpus)) {
-      $form['limits']['concepts']['use_shadow_concepts'] = array(
-        '#type' => 'checkbox',
-        '#title' => t('Also find concepts that are not directly contained within the content'),
-        '#description' => t('It searches for concepts that do not appear in the content but have something to do with it.'),
-        '#default_value' => (!is_null($field->getSetting('use_shadow_concepts')) ? $field->getSetting('use_shadow_concepts') : FALSE),
-        '#parents' => array('settings', 'use_shadow_concepts'),
+    if ($powertagging_mode == 'annotation') {
+      if (!empty($powertagging_corpus)) {
+        $form['limits']['concepts']['use_shadow_concepts'] = array(
+          '#type' => 'checkbox',
+          '#title' => t('Also find concepts that are not directly contained within the content'),
+          '#description' => t('It searches for concepts that do not appear in the content but have something to do with it.'),
+          '#default_value' => (!is_null($field->getSetting('use_shadow_concepts')) ? $field->getSetting('use_shadow_concepts') : FALSE),
+          '#parents' => array('settings', 'use_shadow_concepts'),
+        );
+      }
+
+      $form['limits']['concepts']['browse_concepts_charttypes'] = array(
+        '#type' => 'checkboxes',
+        '#title' => t('Visually browse concepts'),
+        '#options' => array(
+          'spider' => 'Visual Mapper (circle visualisation)',
+          'tree' => 'Tree View',
+        ),
+        '#default_value' => (!is_null($field->getSetting('browse_concepts_charttypes')) ? $field->getSetting('browse_concepts_charttypes') : []),
+        '#description' => t('If at least one of the visualisation types is selected, users can click on a button to use a visualisation to select additional concepts to use in the thesaurus.') . '<br />' . t('Selecting multiple chart types will allow the user to switch between the chart types.'),
+        '#parents' => array('settings', 'browse_concepts_charttypes'),
       );
+
+      if (!SemanticConnector::visualMapperExists()) {
+        $form['limits']['concepts']['browse_concepts_charttypes']['#disabled'] = TRUE;
+        $form['limits']['concepts']['browse_concepts_charttypes']['#prefix'] = '<div class="messages warning">' . t('To enable the "Visually browse concepts" setting the VisualMapper library needs to be installed.') . '</div>';
+      }
     }
 
     $form['limits']['freeterms']['custom_freeterms'] = array(
@@ -387,6 +408,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
       'automatically_tag_new_entities' => $settings['automatically_tag_new_entities'],
       'custom_freeterms' => $settings['custom_freeterms'],
       'use_shadow_concepts' => $settings['use_shadow_concepts'],
+      'browse_concepts_charttypes' => $settings['browse_concepts_charttypes'],
       'fields' => $settings['fields'],
       'default_tags_field' => $settings['default_tags_field'],
       'limits' => $limits,

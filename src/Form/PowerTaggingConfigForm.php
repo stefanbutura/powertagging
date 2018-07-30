@@ -35,6 +35,68 @@ class PowerTaggingConfigForm extends EntityForm {
     $powertagging_config = $this->entity;
     $config = $powertagging_config->getConfig();
 
+    $connection = $powertagging_config->getConnection();
+    /** @var \Drupal\semantic_connector\Api\SemanticConnectorPPXApi $ppx_api */
+    $ppx_api = $connection->getApi('PPX');
+    /** @var \Drupal\semantic_connector\Api\SemanticConnectorPPTApi $ppt_api */
+    $ppt_api = $connection->getApi('PPT');
+    $projects = $ppx_api->getProjects();
+
+    // Set action links for bulk operations.
+    $project_languages = array();
+    foreach ($config['project']['languages'] as $pp_language) {
+      if (!empty($pp_language)) {
+        $project_languages[] = $pp_language;
+      }
+    }
+    if (!empty($project_languages)) {
+      // Make the dynamically added actions look like normal ones.
+      $link_options = array(
+        'attributes' => array(
+          'class' => array(
+            'button',
+            'button-action',
+            'button--primary',
+            'button--small',
+          ),
+        ),
+      );
+
+      $action_tag = Url::fromRoute('entity.powertagging.tag_content', ['powertagging_config' => $powertagging_config->id()], $link_options);
+      $action_update_taxonomy = Url::fromRoute('entity.powertagging.update_vocabulary', ['powertagging_config' => $powertagging_config->id()], $link_options);
+      if (\Drupal::moduleHandler()->moduleExists('pp_taxonomy_manager')) {
+        // Check if this taxonomy / project combination is also used by a
+        // taxonomy manager configuration.
+        foreach ($projects as $project) {
+          if ($project['uuid'] == $powertagging_config->getProjectId()) {
+            $taxonomy_manager_configs = PPTaxonomyManagerConfig::loadMultiple();
+            /** @var PPTaxonomyManagerConfig $taxonomy_manager_config */
+            foreach ($taxonomy_manager_configs as $taxonomy_manager_config) {
+              if ($powertagging_config->getConnectionId() == $taxonomy_manager_config->getConnectionId()) {
+                $settings = $taxonomy_manager_config->getConfig();
+                foreach ($settings['taxonomies'] as $taxonomy_manager_project_id) {
+                  if ($taxonomy_manager_project_id == $project['uuid']) {
+                    $action_update_taxonomy = Url::fromRoute('entity.pp_taxonomy_manager.powertagging_taxonomy_update', ['config' => $taxonomy_manager_config->id(), 'powertagging_config' => $powertagging_config->id()]);
+                    break;
+                  }
+                }
+                break;
+              }
+            }
+            break;
+          }
+        }
+      }
+
+      $form['action_links'] = [
+        '#markup' => '
+      <ul class="action-links">
+          <li>' . Link::fromTextAndUrl(t('Tag content'), $action_tag)->toString() . '</li>
+          <li>' . Link::fromTextAndUrl(t('Update vocabulary'), $action_update_taxonomy)->toString() . '</li>
+      </ul>',
+      ];
+    }
+
     $form['title'] = [
       '#type' => 'textfield',
       '#title' => t('Title'),
@@ -62,12 +124,6 @@ class PowerTaggingConfigForm extends EntityForm {
       '#group' => 'settings',
       '#tree' => TRUE,
     ];
-
-    $connection = $powertagging_config->getConnection();
-    /** @var \Drupal\semantic_connector\Api\SemanticConnectorPPXApi $ppx_api */
-    $ppx_api = $connection->getApi('PPX');
-    /** @var \Drupal\semantic_connector\Api\SemanticConnectorPPTApi $ppt_api */
-    $ppt_api = $connection->getApi('PPT');
 
     // Get the connected project.
     $projects = $ppx_api->getProjects();
@@ -259,54 +315,6 @@ class PowerTaggingConfigForm extends EntityForm {
       '#options' => $properties,
       '#default_value' => $config['data_properties'],
     );
-
-    // Tab: Batch Jobs.
-    $form['batch_jobs'] = array(
-      '#type' => 'details',
-      '#title' => t('Batch jobs'),
-      '#group' => 'settings',
-    );
-
-    $taxonomy_manager_configs = array();
-    if (\Drupal::moduleHandler()->moduleExists('pp_taxonomy_manager')) {
-      $taxonomy_manager_configs = PPTaxonomyManagerConfig::loadMultiple();
-    }
-
-    // Check if this taxonomy / project combination is also used by a
-    // taxonomy manager configuration.
-    $vocbulary_update_url = Url::fromRoute('entity.powertagging.update_vocabulary', ['powertagging_config' => $powertagging_config->id()]);
-    /** @var PPTaxonomyManagerConfig $taxonomy_manager_config */
-    foreach ($taxonomy_manager_configs as $taxonomy_manager_config) {
-      if ($powertagging_config->getConnectionId() == $taxonomy_manager_config->getConnectionId()) {
-        $settings = $taxonomy_manager_config->getConfig();
-        foreach ($settings['taxonomies'] as $taxonomy_manager_project_id) {
-          if ($taxonomy_manager_project_id == $powertagging_config->getProjectId()) {
-            $vocbulary_update_url = Url::fromRoute('entity.pp_taxonomy_manager.powertagging_taxonomy_update', array('config' => $taxonomy_manager_config->id(), 'powertagging_config' => $powertagging_config->id()));
-            break;
-          }
-        }
-      }
-    }
-
-
-    $operations = [
-      [
-        'operation' => Link::createFromRoute(t('Tag content'), 'entity.powertagging.tag_content', ['powertagging_config' => $powertagging_config->id()]),
-        'description' => t('Select the content types for which the tags should be calculated and linked automatically.'),
-      ],[
-        'operation' => Link::fromTextAndUrl(t('Update vocabulary'), $vocbulary_update_url),
-        'description' => t('Update all linked tags from the vocabulary with the PoolParty project.'),
-      ]
-    ];
-    $form['batch_jobs']['operations'] = [
-      '#type' => 'table',
-      '#header' => [
-        'operation' => t('Operation'),
-        'description' => t('Description'),
-      ],
-      '#rows' => $operations,
-      '#tableselect' => FALSE,
-    ];
 
     $form['concept_scheme_restriction'] = array(
       '#type' => 'value',

@@ -28,7 +28,7 @@ class PowerTaggingController extends ControllerBase implements ContainerInjectio
    * @param string $langcode
    *   The language of the entity.
    *
-   * @return \Symfony\Component\HttpFoundation\JsonResponse A JSON response containing the autocomplete suggestions.
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
    *   A JSON response containing the autocomplete suggestions.
    */
   public function autocompleteTags(Request $request, PowerTaggingConfig $powertagging_config, $langcode) {
@@ -92,8 +92,65 @@ class PowerTaggingController extends ControllerBase implements ContainerInjectio
     exit();
   }
 
+  /**
+   * Callback function to sort the selected tags.
+   */
   protected function sortAutocompleteTags($a, $b) {
     return strcasecmp($a['name'], $b['name']);
   }
 
+  /**
+   * Callback function for getting URIs of concepts.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
+   *   A JSON response containing the concepts with term IDs.
+   */
+  public function getConceptIDs() {
+    $concepts = !empty($_POST['concepts']) ? $_POST['concepts'] : array();
+    $settings = !empty($_POST['settings']) ? $_POST['settings'] : array();
+
+    // Get the corresponding taxonomy term id.
+    PowerTagging::addTermId($concepts, $settings['taxonomy_id'], 'concepts', $settings['entity_language']);
+
+    return new JsonResponse($concepts);
+  }
+
+  /**
+   * Get the data for the Visual Mapper inside a PowerTagging form.
+   *
+   * @param PowerTaggingConfig $powertagging_config
+   *   The base-path to the glossary of choice.
+   * @param boolean $fetch_relations
+   *   TRUE if relations (broader, narrower, related) shell be fetched for the
+   *   concept, FALSE if not.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
+   *   A JSON response containing the VisualMapper data.
+   */
+  public function getVisualMapperData($powertagging_config, $fetch_relations = TRUE) {
+    $root_uri = isset($_GET['uri']) && !empty($_GET['uri']) ? $_GET['uri'] : NULL;
+    // @todo: language is not always English.
+    $lang = 'en';
+
+    // Get the data for the concept.
+    /** @var \Drupal\semantic_connector\Entity\SemanticConnectorPPServerConnection $pp_server_connection */
+    $pp_server_connection = $powertagging_config->getConnection();
+    $sparql_endpoints = $pp_server_connection->getSparqlEndpoints($powertagging_config->getProjectId());
+    $concept = NULL;
+    if (count($sparql_endpoints) > 0) {
+      /** @var \Drupal\semantic_connector\Entity\SemanticConnectorSparqlEndpointConnection $sparql_endpoint */
+      $sparql_endpoint = reset($sparql_endpoints);
+      /** @var \Drupal\semantic_connector\Api\SemanticConnectorSparqlApi $sparql_api */
+      $sparql_api = $sparql_endpoint->getApi();
+
+      if ($fetch_relations) {
+        $concept = $sparql_api->getVisualMapperData($root_uri, $lang, (isset($_GET['parent_info']) && $_GET['parent_info']));
+      }
+      else {
+        $concept = $sparql_api->createRootUriObject($root_uri, $lang);
+      }
+    }
+
+    return new JsonResponse($concept);
+  }
 }

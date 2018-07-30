@@ -317,7 +317,7 @@ class PowerTagging {
       }
 
       // Get the corresponding taxonomy term id.
-      $this->addTermId($concepts, $settings['taxonomy_id'], 'concepts', $settings['entity_language']);
+      self::addTermId($concepts, $settings['taxonomy_id'], 'concepts', $settings['entity_language']);
 
       // Ignore all not found taxonomy terms.
       if (!empty($concepts)) {
@@ -344,7 +344,7 @@ class PowerTagging {
       }
 
       // Get the corresponding taxonomy term id.
-      $this->addTermId($concepts, $settings['taxonomy_id'], 'concepts', $settings['entity_language']);
+      self::addTermId($concepts, $settings['taxonomy_id'], 'concepts', $settings['entity_language']);
 
       // Ignore all not found taxonomy terms.
       if (!empty($concepts)) {
@@ -371,7 +371,7 @@ class PowerTagging {
       }
 
       // Get the corresponding taxonomy term id.
-      $this->addTermId($free_terms, $settings['taxonomy_id'], 'free_terms', $settings['entity_language']);
+      self::addTermId($free_terms, $settings['taxonomy_id'], 'free_terms', $settings['entity_language']);
 
       if (!empty($free_terms)) {
         foreach ($free_terms as $free_term) {
@@ -403,7 +403,7 @@ class PowerTagging {
     $suggested_concepts = [];
     if (!empty($project_settings['languages'][$langcode])) {
       $suggested_concepts = $this->PPXApi->suggest($string, $project_settings['languages'][$langcode], $this->config->getProjectId());
-      $this->addTermId($suggested_concepts, $project_settings['taxonomy_id'], 'concepts', $langcode);
+      self::addTermId($suggested_concepts, $project_settings['taxonomy_id'], 'concepts', $langcode);
     }
     $this->result = $suggested_concepts;
   }
@@ -743,13 +743,15 @@ class PowerTagging {
 
       if (!empty($existing_terms_by_uri)) {
         $concepts_detail_data = $this->getConceptsDetails(array_keys($existing_terms_by_uri), $langcode);
-        foreach ($concepts_detail_data as $concept_detail_data) {
-          if (isset($existing_terms_by_uri[$concept_detail_data['uri']])) {
-            $existing_term = $existing_terms_by_uri[$concept_detail_data['uri']];
-            $term_data_changed = $this->updateTaxonomyTermDetails($existing_term, (object) $concept_detail_data);
-            // Only save the taxonomy term if any information has changed.
-            if ($term_data_changed) {
-              $existing_term->save();
+        if (!is_null($concepts_detail_data)) {
+          foreach ($concepts_detail_data as $concept_detail_data) {
+            if (isset($existing_terms_by_uri[$concept_detail_data['uri']])) {
+              $existing_term = $existing_terms_by_uri[$concept_detail_data['uri']];
+              $term_data_changed = $this->updateTaxonomyTermDetails($existing_term, (object) $concept_detail_data);
+              // Only save the taxonomy term if any information has changed.
+              if ($term_data_changed) {
+                $existing_term->save();
+              }
             }
           }
         }
@@ -1401,7 +1403,7 @@ class PowerTagging {
    * @param string $langcode
    *   The language of the concept label.
    */
-  protected function addTermId(array &$concepts, $vid, $type, $langcode) {
+  public static function addTermId(array &$concepts, $vid, $type, $langcode) {
     if (empty($concepts)) {
       return;
     }

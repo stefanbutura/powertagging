@@ -16,6 +16,7 @@ use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
 use Drupal\powertagging\Plugin\Field\FieldType\PowerTaggingTagsItem;
 use Drupal\powertagging\PowerTagging;
+use Drupal\semantic_connector\SemanticConnector;
 use Drupal\taxonomy\Entity\Term;
 
 /**
@@ -138,6 +139,44 @@ class PowerTaggingTagsWidget extends WidgetBase {
       ],
     ];
 
+    $powertagging_config = PowerTaggingConfig::load($field_settings['powertagging_id']);
+    $powertagging_config_settings = $powertagging_config->getConfig();
+
+    // Check if the Visual Mapper has to be added.
+    $add_visual_mapper = FALSE;
+    if ($powertagging_config_settings['project']['mode'] == 'annotation' && isset($field_settings['browse_concepts_charttypes'])) {
+      $chart_types = array_values(array_filter($field_settings['browse_concepts_charttypes']));
+      $add_visual_mapper = (!empty($chart_types) && SemanticConnector::visualMapperExists());
+    }
+
+    if ($add_visual_mapper) {
+      $element['powertagging']['browse_tags'] = array(
+        '#value' => t('Browse tags'),
+        '#type' => 'button',
+        '#attributes' => array(
+          'class' => array('powertagging-browse-tags'),
+        ),
+      );
+
+      // Using #children prevents stripping of attributes and form elements.
+      $element['powertagging']['browse_tags_area'] = array(
+        '#children' => '
+<div class="powertagging-browse-tags-area" style="display:none;">
+  <div class="powertagging-browse-tags-search">
+    <label>Search concept</label>
+    <input type="text" class="powertagging-browse-tags-search-ac form-text" />
+  </div>
+  <div class="powertagging-browse-tags-selection">
+    <p>Tags to add:</p>
+    <div class="powertagging-browse-tags-selection-results"></div>
+     <button class="powertagging-browse-tags-selection-save" type="button">Save</button>
+     <button class="powertagging-browse-tags-selection-cancel" type="button">Cancel</button>
+  </div>
+  <div class="powertagging-browse-tags-vm"></div>
+</div>'
+      );
+    }
+
     $element['powertagging']['tags_result'] = [
       '#type' => 'item',
       '#title' => t('Your selected tags'),
@@ -153,6 +192,9 @@ class PowerTaggingTagsWidget extends WidgetBase {
     $element['powertagging']['get_tags'] = [
       '#value' => t('Get tags'),
       '#type' => 'button',
+      '#attributes' => array(
+        'class' => array('powertagging-get-tags'),
+      ),
     ];
 
     // Attach the libraries.
@@ -164,6 +206,15 @@ class PowerTaggingTagsWidget extends WidgetBase {
         'powertagging' => $this->getJavaScriptSettings($tag_ids, $default_terms, $langcode),
       ],
     ];
+
+    // Add the Visual Mapper if required.
+    if ($add_visual_mapper) {
+      $element['#attached']['library'][] = 'semantic_connector/visual_mapper';
+
+      /*$element['#attached']['library'] = array(
+        array('system', 'ui.dialog'),
+      );*/
+    }
 
     return $element;
   }
@@ -354,6 +405,15 @@ class PowerTaggingTagsWidget extends WidgetBase {
       }
     }
 
+    // Check if the Visual Mapper has to be added.
+    $visual_mapper_chart_types = [];
+    if ($powertagging_config['project']['mode'] == 'annotation' && isset($field_settings['browse_concepts_charttypes'])) {
+      $chart_types = array_values(array_filter($field_settings['browse_concepts_charttypes']));
+      if (!empty($chart_types) && SemanticConnector::visualMapperExists()) {
+        $visual_mapper_chart_types = $chart_types;
+      }
+    }
+
     $file_upload_settings = $field->getSetting('file_upload');
     $settings = [];
     $settings[$field->getName()] = [
@@ -371,6 +431,7 @@ class PowerTaggingTagsWidget extends WidgetBase {
         'freeterms_threshold' => $limits['freeterms_threshold'],
         'custom_freeterms' => ($powertagging_config['project']['mode'] == 'annotation' ? (!is_null($field->getSetting('custom_freeterms')) ? $field->getSetting('custom_freeterms') : TRUE) : FALSE),
         'use_shadow_concepts' => ($powertagging_config['project']['mode'] == 'annotation' ? (!is_null($field->getSetting('use_shadow_concepts')) ? $field->getSetting('use_shadow_concepts') : FALSE) : FALSE),
+        'browse_concepts_charttypes' => (!empty($visual_mapper_chart_types) ? $visual_mapper_chart_types : []),
         'concept_scheme_restriction' => (isset($powertagging_config['concept_scheme_restriction']) ? $powertagging_config['concept_scheme_restriction'] : []),
         'data_properties' => $powertagging_config['data_properties'],
         'entity_language' => $langcode,

@@ -58,11 +58,15 @@
         }
       });
 
+      var powertagging_vm = {};
       /**
        * Set the "click" event to the "Get tags" button.
        */
       $(context).find("div.field--type-powertagging-tags").once("powertagging_widget").each(function () {
-        $(this).find("input[type=\"submit\"]").click(function (event) {
+        var pt_field_id = $(this).data("drupal-selector").substr(5, ($(this).data("drupal-selector").length - 13)).replace(/-/g, '_');
+        var pt_field = drupalSettings.powertagging[pt_field_id];
+
+        $(this).find(".powertagging-get-tags").click(function (event) {
           event.preventDefault();
 
           var pt_field_id = $(this).data('drupal-selector').replace(/^edit-(.*)-powertagging-get-tags$/, "$1").replace(/-/g, "_");
@@ -72,6 +76,197 @@
             renderResult(pt_field_id, tags);
           }, "json");
         });
+
+        if (pt_field.settings.browse_concepts_charttypes.length > 0) {
+          $(this).find('.powertagging-browse-tags-area').attr('id', $(this).attr('id') + '-browse-tags');
+          $(this).find(".powertagging-browse-tags").click(function (event) {
+            event.preventDefault();
+            var powertagging_field = $(this).closest('.field--type-powertagging-tags');
+            var field_id = powertagging_field.attr("id").substr(5, (powertagging_field.attr("id").length - 13)).replace(/-/g, "_");
+            var pt_field = drupalSettings.powertagging[field_id];
+            var browse_tags_area = $('#' + powertagging_field.attr("id") + '-browse-tags');
+
+            var settings = {
+              "enabled": 1,
+              "width": 680,
+              "height": 680,
+              "chartTypes": pt_field.settings.browse_concepts_charttypes,
+              "headerColor": "#dee4db",
+              "spiderChart": {
+                "rootOuterRadius": 260,
+                "legendPositionX": "right",
+                "legendStyle": "circle"
+              },
+              export: {
+                "enabled": false
+              },
+              "relations": {
+                "parents": {
+                  "colors": {"bright": "#B7C9CD", "dark": "#4B7782"},
+                  "wording": {"legend": "Broader"}
+                },
+                "children": {
+                  "colors": {"bright": "#C6E2D3", "dark": "#70B691"},
+                  "wording": {"legend": "Narrower"}
+                },
+                "related": {
+                  "colors": {"bright": "#FFC299", "dark": "#FF6600"},
+                  "wording": {"legend": "Related"}
+                }
+              }
+            };
+            powertagging_vm[field_id] = browse_tags_area.children(".powertagging-browse-tags-vm").empty().initVisualMapper(settings, {"conceptLoaded": [addConceptButton]});
+            powertagging_vm[field_id].load(drupalSettings.path.baseUrl + "powertagging/get-visualmapper-data/" + pt_field.settings.powertagging_id, "", "en");
+
+            // The dialog gets opened the first time.
+            if (powertagging_field.find('.powertagging-browse-tags-area').length > 0) {
+              browse_tags_area.dialog({
+                title: Drupal.t('Browse tags'),
+                resizable: false,
+                height: "auto",
+                width: 900,
+                modal: true,
+                open: function(event, ui) {
+                  $('.ui-widget-overlay').bind('click', function() {
+                    $(this).siblings('.ui-dialog').find('.ui-dialog-content').dialog('close');
+                  });
+                }
+              });
+            }
+            // The dialog was already opened before.
+            else {
+              browse_tags_area.find('.powertagging-browse-tags-selection-results').empty();
+              browse_tags_area.dialog("open");
+            }
+
+            browse_tags_area.find('.powertagging-browse-tags-selection-cancel').unbind('click')
+              .click(function () {
+                $(this).closest('.powertagging-browse-tags-area').dialog('close');
+              });
+
+            browse_tags_area.find('.powertagging-browse-tags-selection-save').unbind('click')
+              .click(function () {
+                var browse_tags_area = $(this).closest('.powertagging-browse-tags-area');
+                var field_id_full = browse_tags_area.attr('id').slice(0, -12);
+                var field_id = field_id_full.substr(5, (field_id_full.length - 13)).replace(/-/g, "_");
+                var pt_field = drupalSettings.powertagging[field_id];
+
+                var concepts = [];
+                $(this).siblings('.powertagging-browse-tags-selection-results').children().each(function () {
+                  concepts.push({
+                    uri: $(this).data('uri'),
+                    prefLabel: $(this).data('label')
+                  });
+                });
+
+                var data = {settings: pt_field.settings, concepts: concepts};
+                $.post(drupalSettings.path.baseUrl + "powertagging/get-concept-tids", data, function (result_tags) {
+                  // Add the tags to the result.
+                  result_tags.forEach(function (result_tag) {
+                    result_tag.label = result_tag.prefLabel;
+                    result_tag.type = 'concept';
+                    result_tag.score = 100;
+                    PTContainers.resultArea(field_id).addTag(result_tag);
+                  });
+
+                  browse_tags_area.dialog('close');
+                }, "json");
+              });
+
+            browse_tags_area.find('.powertagging-browse-tags-search-ac').autocomplete({
+              minLength: 2,
+              source: drupalSettings.path.baseUrl + "powertagging/autocomplete-tags/" + pt_field.settings.powertagging_id + '/' + pt_field.settings.entity_language,
+              focus: function (event, ui) {
+                this.value = ui.item.label;
+                return false;
+              },
+              select: function (event, ui) {
+                var powertagging_field = $(this).closest('.field--type-powertagging-tags');
+                var field_id = powertagging_field.attr("id").substr(5).replace(/-/g, "_");
+                if (ui.item) {
+                  powertagging_vm[field_id].updateConcept({id: ui.item.url});
+                }
+                return false;
+              }
+            });
+          });
+
+          var addConceptButton = function (vm, data) {
+            var chart_header = $(vm.getDOMElement()).children('.chart-header');
+            var $add_concept = chart_header.find(".add-concept-button");
+
+            if ($add_concept.length === 0) {
+              chart_header.prepend('<div class="add-concept-button button"></div>');
+              $add_concept = chart_header.find(".add-concept-button");
+            }
+
+            // Check if the tag is already in use.
+            var browse_tags_area = $add_concept.closest('.powertagging-browse-tags-area');
+            var field_id_full = browse_tags_area.attr('id').slice(0, -12);
+            var field_id = field_id_full.substr(5, (field_id_full.length - 13)).replace(/-/g, "_");
+            var pt_field = drupalSettings.powertagging[field_id];
+
+            // Data is available for the concept.
+            if (data.hasOwnProperty('type')) {
+              // Normal concept.
+              if (data.type !== "project" && data.type !== "conceptScheme") {
+                var tag_active = ($('#' + field_id_full + ' .powertagging-tag-result .powertagging-tag[data-uri="' + data.id + '"]').length > 0 || browse_tags_area.find('.powertagging-browse-tags-selection-results').children('.powertagging-browse-tags-tag[data-uri="' + data.id + '"]').length > 0);
+
+                $add_concept.html('<a class="powertagging-browse-tags-add-concept' + (tag_active ? ' active' : '') + '" data-label="' + data.name + '" data-uri="' + data.id + '" href="#">Add Concept</a>');
+                $add_concept.children('a').click(function (e) {
+                  e.preventDefault();
+                  if ($(this).hasClass('active')) {
+                    return false;
+                  }
+
+                  var tag_selection = $(this).closest('.powertagging-browse-tags-area').find('.powertagging-browse-tags-selection-results');
+                  tag_selection.append('<div class="powertagging-browse-tags-tag" data-label="' + $(this).data('label') + '" data-uri="' + $(this).data('uri') + '">' + $(this).data('label') + '</div>');
+                  $(this).addClass('active');
+
+                  tag_selection.find('.powertagging-browse-tags-tag').unbind('click')
+                    .click(function () {
+                      // Check if the add concept button has to be made active again.
+                      var chart_header = $(this).closest('.powertagging-browse-tags-area').find(".chart-header");
+                      var add_concept_button = chart_header.find(".add-concept-button > a");
+
+                      if (add_concept_button.length > 0 && add_concept_button.data('uri') === $(this).data('uri')) {
+                        add_concept_button.removeClass('active');
+                      }
+
+                      // Remove the item from the selection list.
+                      $(this).remove();
+                    });
+                });
+              }
+              // Concept scheme.
+              else {
+                $add_concept.html("");
+              }
+            }
+            // Data has to be fetched first.
+            else {
+              // Empty the area first.
+              $add_concept.html("");
+
+              // Then load the data.
+              $.ajax({
+                dataType: "json",
+                url: drupalSettings.path.baseUrl + "powertagging/get-visualmapper-data/" + pt_field.settings.powertagging_id,
+                data: {
+                  uri: data.id,
+                  lang: vm.language
+                },
+                success: function (concept) {
+                  if (concept) {
+                    // Since data gets fetched via AJAX, the JS for the connected content
+                    // needs to be updated here.
+                    addConceptButton(vm, concept);
+                  }
+                }
+              });
+            }
+          };
+        }
       });
 
       /**

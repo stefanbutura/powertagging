@@ -29,6 +29,7 @@ widget:
     - core/jquery
     - core/jquery.once
     - core/autocomplete
+    - core/jquery.ui.dialog
 
 widget_css_only:
   version: 1.0

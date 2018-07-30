@@ -54,6 +54,18 @@ powertagging.config:
   requirements:
     _permission: 'administer powertagging'
 
+powertagging.extract:
+  path: '/powertagging/extract/{powertagging_config}'
+  defaults:
+    _controller: '\Drupal\powertagging\Controller\PowerTaggingController::extract'
+    _title: 'Extract concepts and free terms from content.'
+  requirements:
+    _permission: 'access content'
+  options:
+    parameters:
+      powertagging_config:
+        type: entity:powertagging
+
 powertagging.autocomplete_tags:
   path: '/powertagging/autocomplete-tags/{powertagging_config}/{langcode}'
   defaults:
@@ -66,14 +78,36 @@ powertagging.autocomplete_tags:
       powertagging_config:
         type: entity:powertagging
 
-powertagging.extract:
-  path: '/powertagging/extract/{powertagging_config}'
+powertagging.get_visualmapper_data:
+  path: '/powertagging/get-visualmapper-data/{powertagging_config}'
   defaults:
-    _controller: '\Drupal\powertagging\Controller\PowerTaggingController::extract'
-    _title: 'Extract concepts and free terms from content.'
+    _controller: '\Drupal\powertagging\Controller\PowerTaggingController::getVisualMapperData'
+    _title: 'Get Visual Mapper data for a PowerTagging configuration.'
+    fetch_relations: TRUE
   requirements:
     _permission: 'access content'
   options:
     parameters:
       powertagging_config:
         type: entity:powertagging
+
+powertagging.get_visualmapper_data_slim:
+  path: '/powertagging/get-visualmapper-data-slim/{powertagging_config}'
+  defaults:
+    _controller: '\Drupal\powertagging\Controller\PowerTaggingController::getVisualMapperData'
+    _title: 'Get Visual Mapper data in JSON format without any relations for a PowerTagging configuration.'
+    fetch_relations: FALSE
+  requirements:
+    _permission: 'access content'
+  options:
+    parameters:
+      powertagging_config:
+        type: entity:powertagging
+
+powertagging.get_concept_tids:
+  path: '/powertagging/get-concept-tids'
+  defaults:
+    _controller: '\Drupal\powertagging\Controller\PowerTaggingController::getConceptIDs'
+    _title: 'Get Visual Mapper data for a PowerTagging configuration.'
+  requirements:
+    _permission: 'access content'
