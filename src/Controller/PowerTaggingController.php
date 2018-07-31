@@ -129,25 +129,28 @@ class PowerTaggingController extends ControllerBase implements ContainerInjectio
    */
   public function getVisualMapperData($powertagging_config, $fetch_relations = TRUE) {
     $root_uri = isset($_GET['uri']) && !empty($_GET['uri']) ? $_GET['uri'] : NULL;
-    // @todo: language is not always English.
-    $lang = 'en';
+    $pt_settings = $powertagging_config->getConfig();
+    $concept = new \stdClass();
+    if (isset($_GET['lang']) && !empty($_GET['lang']) && isset($pt_settings['project']['languages'][$_GET['lang']]) && !empty($pt_settings['project']['languages'][$_GET['lang']])) {
+      $lang = $pt_settings['project']['languages'][$_GET['lang']];
 
-    // Get the data for the concept.
-    /** @var \Drupal\semantic_connector\Entity\SemanticConnectorPPServerConnection $pp_server_connection */
-    $pp_server_connection = $powertagging_config->getConnection();
-    $sparql_endpoints = $pp_server_connection->getSparqlEndpoints($powertagging_config->getProjectId());
-    $concept = NULL;
-    if (count($sparql_endpoints) > 0) {
-      /** @var \Drupal\semantic_connector\Entity\SemanticConnectorSparqlEndpointConnection $sparql_endpoint */
-      $sparql_endpoint = reset($sparql_endpoints);
-      /** @var \Drupal\semantic_connector\Api\SemanticConnectorSparqlApi $sparql_api */
-      $sparql_api = $sparql_endpoint->getApi();
+      // Get the data for the concept.
+      /** @var \Drupal\semantic_connector\Entity\SemanticConnectorPPServerConnection $pp_server_connection */
+      $pp_server_connection = $powertagging_config->getConnection();
+      $sparql_endpoints = $pp_server_connection->getSparqlEndpoints($powertagging_config->getProjectId());
+      $concept = NULL;
+      if (count($sparql_endpoints) > 0) {
+        /** @var \Drupal\semantic_connector\Entity\SemanticConnectorSparqlEndpointConnection $sparql_endpoint */
+        $sparql_endpoint = reset($sparql_endpoints);
+        /** @var \Drupal\semantic_connector\Api\SemanticConnectorSparqlApi $sparql_api */
+        $sparql_api = $sparql_endpoint->getApi();
 
-      if ($fetch_relations) {
-        $concept = $sparql_api->getVisualMapperData($root_uri, $lang, (isset($_GET['parent_info']) && $_GET['parent_info']));
-      }
-      else {
-        $concept = $sparql_api->createRootUriObject($root_uri, $lang);
+        if ($fetch_relations) {
+          $concept = $sparql_api->getVisualMapperData($root_uri, $lang, (isset($_GET['parent_info']) && $_GET['parent_info']));
+        }
+        else {
+          $concept = $sparql_api->createRootUriObject($root_uri, $lang);
+        }
       }
     }
 

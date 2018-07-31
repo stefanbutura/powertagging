@@ -434,7 +434,9 @@ class PowerTaggingTagsWidget extends WidgetBase {
         'browse_concepts_charttypes' => (!empty($visual_mapper_chart_types) ? $visual_mapper_chart_types : []),
         'concept_scheme_restriction' => (isset($powertagging_config['concept_scheme_restriction']) ? $powertagging_config['concept_scheme_restriction'] : []),
         'data_properties' => $powertagging_config['data_properties'],
+        // The currently used Drupal language of the entity.
         'entity_language' => $langcode,
+        // An array of allowed Drupal languages.
         'allowed_languages' => $allowed_langcodes,
         'corpus_id' => $powertagging_config['project']['corpus_id'],
         'max_file_size' => (isset($file_upload_settings['max_file_size']) ? $file_upload_settings['max_file_size'] : (2 * 1048576)),
