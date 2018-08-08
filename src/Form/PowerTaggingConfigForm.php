@@ -608,33 +608,34 @@ class PowerTaggingConfigForm extends EntityForm {
       ],
       'field_scope_notes' => [
         'field_name' => 'field_scope_notes',
-        'type' => 'text_long',
+        'type' => 'string_long',
         'label' => t('Scope notes'),
-        'description' => t('Information about the scope of a concept'),
+        'description' => t('An information about the scope of a concept'),
         'cardinality' => -1,
-        'field_settings' => [],
         'required' => FALSE,
         'instance_settings' => [],
-        'widget' => [
+        'field_settings' => [],
+        'widget' => array(
           'type' => 'string_textarea',
           'weight' => 6,
-        ],
+        ),
       ],
       'field_related_concepts' => [
         'field_name' => 'field_related_concepts',
-        'type' => 'text',
+        'type' => 'link',
         'label' => t('Related concepts'),
         'description' => t('URIs to related concepts'),
         'cardinality' => -1,
-        'field_settings' => [
-          'max_length' => 1024,
-        ],
         'required' => FALSE,
-        'instance_settings' => [],
-        'widget' => [
-          'type' => 'text_textfield',
-          'weight' => 7,
+        'instance_settings' => [
+          'link_type' => LinkItemInterface::LINK_GENERIC,
+          'title' => DRUPAL_DISABLED,
         ],
+        'field_settings' => [],
+        'widget' => array(
+          'type' => 'link_default',
+          'weight' => 7,
+        ),
       ],
       'field_exact_match' => [
         'field_name' => 'field_exact_match',

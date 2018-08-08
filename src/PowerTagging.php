@@ -594,7 +594,7 @@ class PowerTagging {
           case 'core':
             // Normal core field.
             if ($tag_type['widget'] !== 'entity_reference_autocomplete' && $tag_type['widget'] !== 'entity_reference_autocomplete_tags') {
-              $tag_content = trim(strip_tags($value['value']));
+              $tag_content = trim(strip_tags(isset($value['value']) ? $value['value'] : (isset($value['uri']) ? $value['uri'] : '')));
               if (!empty($tag_content)) {
                 $text_parts[] = $tag_content;
               }
@@ -611,7 +611,7 @@ class PowerTagging {
             break;
 
           case 'text':
-            $tag_content = trim(strip_tags($value['value']));
+            $tag_content = trim(strip_tags(isset($value['value']) ? $value['value'] : (isset($value['uri']) ? $value['uri'] : '')));
             if ($tag_type['widget'] == 'text_textarea_with_summary') {
               $tag_summary = trim(strip_tags($value['summary']));
               if (!empty($tag_summary) && $tag_summary != $tag_content) {
