@@ -147,11 +147,13 @@ class PowerTagging {
       'projectId' => $this->config->getProjectId(),
       'numberOfConcepts' => (int) $settings['concepts_per_extraction'],
       'numberOfTerms' => (int) $settings['freeterms_per_extraction'],
-      'corpusScoring' => $corpus_id,
     ];
 
-    if (!empty($settings['use_shadow_concepts']) && $project_config['mode'] == 'annotation') {
-      $param['shadowConceptCorpusId'] = $corpus_id;
+    if (!empty($corpus_id)) {
+      $param['corpusScoring'] = $corpus_id;
+      if (isset($settings['use_shadow_concepts']) && !empty($settings['use_shadow_concepts']) && $project_config['mode'] == 'annotation') {
+        $param['shadowConceptCorpusId'] = $corpus_id;
+      }
     }
     if (!empty($settings['concept_scheme_restriction'])) {
       $param['conceptSchemeFilters'] = $settings['concept_scheme_restriction'];

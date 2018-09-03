@@ -228,7 +228,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
       $form['default_tags_field'] = [
         '#type' => 'radios',
         '#title' => t('Term reference fields that can be used for default values'),
-        '#description' => t('Select the field from witch the linked terms are used as default values.'),
+        '#description' => t('Select the field from which the linked terms are used as default values.'),
         '#options' => $term_references,
         '#default_value' => $field->getSetting('default_tags_field'),
       ];
@@ -263,7 +263,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
     $form['fields'] = [
       '#type' => 'checkboxes',
       '#title' => t('Fields that can be used for tagging'),
-      '#description' => t('Select the fields from witch the concepts and free terms are extracted.'),
+      '#description' => t('Select the fields from which the concepts and free terms are extracted.'),
       '#options' => $options,
       '#default_value' => $field->getSetting('fields'),
       '#required' => TRUE,

@@ -197,7 +197,7 @@ class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigI
    */
   public static function loadConfigs($connection_id = '', $only_available_services = FALSE) {
     $configurations = [];
-    $config_query = \Drupal::entityQuery('PowerTaggingConfig');
+    $config_query = \Drupal::entityQuery('powertagging');
 
     if (!empty($connection_id)) {
       $config_query->condition('connection_id', $connection_id);
