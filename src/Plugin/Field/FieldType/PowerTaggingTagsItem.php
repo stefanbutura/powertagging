@@ -319,9 +319,9 @@ class PowerTaggingTagsItem extends FieldItemBase {
         '#parents' => array('settings', 'browse_concepts_charttypes'),
       );
 
-      if (!SemanticConnector::visualMapperExists()) {
+      if (!SemanticConnector::visualMapperUsable()) {
         $form['limits']['concepts']['browse_concepts_charttypes']['#disabled'] = TRUE;
-        $form['limits']['concepts']['browse_concepts_charttypes']['#prefix'] = '<div class="messages warning">' . t('To enable the "Visually browse concepts" setting the VisualMapper library needs to be installed.') . '</div>';
+        $form['limits']['concepts']['browse_concepts_charttypes']['#prefix'] = '<div class="messages warning">' . t('To enable the "Visually browse concepts" all requirements of the VisualMapper library need to be met.') . '</div>';
       }
     }
 

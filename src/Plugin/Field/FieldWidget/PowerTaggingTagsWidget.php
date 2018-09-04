@@ -146,7 +146,7 @@ class PowerTaggingTagsWidget extends WidgetBase {
     $add_visual_mapper = FALSE;
     if ($powertagging_config_settings['project']['mode'] == 'annotation' && isset($field_settings['browse_concepts_charttypes'])) {
       $chart_types = array_values(array_filter($field_settings['browse_concepts_charttypes']));
-      $add_visual_mapper = (!empty($chart_types) && SemanticConnector::visualMapperExists());
+      $add_visual_mapper = (!empty($chart_types) && SemanticConnector::visualMapperUsable());
     }
 
     if ($add_visual_mapper) {
@@ -409,7 +409,7 @@ class PowerTaggingTagsWidget extends WidgetBase {
     $visual_mapper_chart_types = [];
     if ($powertagging_config['project']['mode'] == 'annotation' && isset($field_settings['browse_concepts_charttypes'])) {
       $chart_types = array_values(array_filter($field_settings['browse_concepts_charttypes']));
-      if (!empty($chart_types) && SemanticConnector::visualMapperExists()) {
+      if (!empty($chart_types) && SemanticConnector::visualMapperUsable()) {
         $visual_mapper_chart_types = $chart_types;
       }
     }
