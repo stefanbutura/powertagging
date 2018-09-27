@@ -92,7 +92,7 @@ class PowerTaggingTagContentForm extends FormBase {
       );
     }
     else {
-      drupal_set_message(t('No taggable content types found for PowerTagging configuration "%ptconfname".', array('%ptconfname' => $powertagging_config->getTitle())), 'error');
+      \Drupal::messenger()->addMessage(t('No taggable content types found for PowerTagging configuration "%ptconfname".', array('%ptconfname' => $powertagging_config->getTitle())), 'error');
       return new RedirectResponse(Url::fromRoute('entity.powertagging.edit_config_form', ['powertagging' => $powertagging_config->id()])->toString());
     }
 

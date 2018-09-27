@@ -285,10 +285,9 @@ class PowerTaggingConfig extends ConfigEntityBase implements PowerTaggingConfigI
     foreach ($fields as $entity_type_id => $fields_per_entity_type) {
       foreach ($fields_per_entity_type as $field_type => $field) {
         foreach ($field['bundles'] as $bundle) {
-
-          /** @var \Drupal\field\Entity\FieldConfig $field_definition */
           $field_definitions = $entityFieldManager->getFieldDefinitions($entity_type_id, $bundle);
           if (isset($field_definitions[$field_type])) {
+            /** @var \Drupal\field\Entity\FieldConfig $field_definition */
             $field_definition = $field_definitions[$field_type];
             $powertagging_id = $field_definition->getFieldStorageDefinition()
               ->getSetting('powertagging_id');

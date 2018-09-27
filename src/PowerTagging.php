@@ -16,6 +16,7 @@ use Drupal\file\Entity\File;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
 use Drupal\powertagging\Plugin\Field\FieldType\PowerTaggingTagsItem;
 use Drupal\semantic_connector\Api\SemanticConnectorPPXApi;
+use Drupal\semantic_connector\SemanticConnector;
 use Drupal\taxonomy\Entity\Term;
 
 /**
@@ -585,9 +586,7 @@ class PowerTagging {
     );
     $text_parts = [];
     foreach ($fields as $tag_field_name => $tag_type) {
-      if (!$entity->hasField($tag_field_name) ||
-        $entity->get($tag_field_name)->count() == 0
-      ) {
+      if (!$entity->hasField($tag_field_name) || $entity->get($tag_field_name)->count() == 0) {
         continue;
       }
 
@@ -1492,5 +1491,140 @@ class PowerTagging {
       return 0;
     }
     return ($a['score'] < $b['score']) ? 1 : -1;
+  }
+
+  /**
+   * Get the configuration for the entity extraction.
+   *
+   * @param string $entity_type
+   *   The type of the entity to get the extraction settings for
+   * @param string $bundle
+   *   The bundle of the entity to get the extraction settings for
+   *
+   * @return array
+   *   An associative array for the entity extraction configuration for the
+   *   requested entities.
+   */
+  public static function getEntityExtractionSettings($entity_type, $bundle) {
+    $extraction_config = \Drupal::config('powertagging.settings')->get('entity_extraction_settings');
+    $default_config = [
+      'enabled' => FALSE,
+      'connection_id' => '',
+      'languages' => [],
+      'fields' => [],
+      'types' => ['person', 'organization', 'location'],
+      'display_entities' => FALSE,
+    ];
+
+    if (isset($extraction_config[$entity_type]) && isset($extraction_config[$entity_type][$bundle])) {
+      return array_merge($default_config, $extraction_config[$entity_type][$bundle]);
+    }
+    else {
+      return $default_config;
+    }
+  }
+
+  /**
+   * Builds and inserts entity extraction entries for a given entity.
+   *
+   * @param string $entity_type
+   *   The entity type, e.g. "node"
+   * @param \Drupal\Core\Entity\ContentEntityBase $entity
+   *   The entity object.
+   */
+  public static function buildEntityExtractionCache($entity_type, $entity) {
+    switch ($entity_type) {
+      case 'node':
+        $entity_extraction_settings = self::getEntityExtractionSettings($entity_type, $entity->bundle());
+        $entity_language = $entity->language()->getId();
+        // Entities need to be extracted for this type of entity.
+        if ($entity_extraction_settings['enabled'] && !empty($entity_extraction_settings['fields']) && isset($entity_extraction_settings['languages'][$entity_language]) && !empty($entity_extraction_settings['languages'][$entity_language])) {
+          $threshold = 0;
+          $connection = SemanticConnector::getConnection('pp_server', $entity_extraction_settings['connection_id']);
+          /** @var SemanticConnectorPPXApi $ppx_api */
+          $ppx_api = $connection->getApi('PPX');
+
+          $fields = $entity_extraction_settings['fields'];
+          foreach ($fields as $field_id) {
+            if ($entity->hasField($field_id) && $entity->get($field_id)->count() > 0) {
+              foreach ($entity->get($field_id)->getValue() as $delta => $field_value) {
+                $extracted_entities = $ppx_api->extractNamedEntities(utf8_encode($field_value['value']), $entity_extraction_settings['languages'][$entity_language], $entity_extraction_settings['types']);
+                if (!empty($extracted_entities)) {
+                  $to_replace = [];
+                  foreach ($extracted_entities as $extracted_entity) {
+                    if ($extracted_entity['score'] > $threshold) {
+                      foreach ($extracted_entity['positions'] as $position) {
+                        $to_replace[$position['beginningIndex'] . '_' . $position['endIndex']] = $extracted_entity;
+                      }
+                    }
+                  }
+
+                  $schemaorg_properties = [
+                    'organization' => [
+                      'type' => 'Organization',
+                      'property' => 'name',
+                    ],
+                    'person' => [
+                      'type' => 'Person',
+                      'property' => 'name',
+                    ],
+                    'location' => [
+                      'type' => 'Place',
+                      'property' => 'name',
+                    ]
+                  ];
+
+                  // Replace strings from the back.
+                  krsort($to_replace, SORT_NUMERIC);
+                  $result_html = $field_value['value'];
+                  foreach ($to_replace as $position => $extracted_entity) {
+                    $position = explode('_', $position);
+                    if (substr($result_html, $position[0], strlen($extracted_entity['textValue'])) === $extracted_entity['textValue']) {
+                      $new_markup = substr($result_html, 0, $position[0]);
+                      $new_markup .= '<span class="powertagging-ner powertagging-ner-' . $extracted_entity['type'] . '" vocab="http://schema.org/" typeof="' . $schemaorg_properties[$extracted_entity['type']]['type'] . '"><span property="' . $schemaorg_properties[$extracted_entity['type']]['property'] . '">' . $extracted_entity['textValue'] . '</span></span>';
+                      $new_markup .= substr($result_html, $position[1] + 1);
+                      $result_html = $new_markup;
+                    }
+                  }
+
+                  // Save the HTML to the entity extraction cache.
+                  \Drupal::database()->insert('powertagging_entity_extraction_cache')
+                    ->fields(array(
+                      'entity_type' => $entity_type,
+                      'bundle' => $entity->bundle(),
+                      'entity_id' => $entity->id(),
+                      'language' => $entity_language,
+                      'field_name' => $field_id,
+                      'delta' => $delta,
+                      'html' => $result_html,
+                    ))
+                    ->execute();
+                }
+              }
+            }
+          }
+        }
+        break;
+    }
+  }
+
+  /**
+   * Deletes all entity extraction entries for a given entity.
+   *
+   * @param string $entity_type
+   *   The entity type, e.g. "node"
+   * @param \Drupal\Core\Entity\ContentEntityBase $entity
+   *   The entity object.
+   */
+  public static function deleteEntityExtractionCache($entity_type, $entity) {
+    switch ($entity_type) {
+      case 'node':
+        \Drupal::database()->delete('powertagging_entity_extraction_cache')
+          ->condition('entity_type', $entity_type)
+          ->condition('entity_id', $entity->id())
+          ->condition('language', $entity->language()->getId())
+          ->execute();
+        break;
+    }
   }
 }

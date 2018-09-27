@@ -111,3 +111,11 @@ powertagging.get_concept_tids:
     _title: 'Get Visual Mapper data for a PowerTagging configuration.'
   requirements:
     _permission: 'access content'
+
+powertagging.extract_entity_tags:
+  path: '/powertagging/extract-entity-tags/{entity_type}/{bundle}'
+  defaults:
+    _form: '\Drupal\powertagging\Form\PowerTaggingExtractEntitiesBatchForm'
+    _title: 'Extract entities for a given bundle.'
+  requirements:
+    _permission: 'administer powertagging'

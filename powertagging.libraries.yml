@@ -1,12 +1,18 @@
+general:
+  version: VERSION
+  css:
+    theme:
+      css/powertagging.css: {}
+
 admin_area:
-  version: 1.0
+  version: VERSION
   js:
     js/powertagging.admin.js: {}
   dependencies:
     - core/jquery
 
 slider:
-  version: 1.0
+  version: VERSION
   js:
     js/slider.js: {}
   css:
@@ -18,7 +24,7 @@ slider:
     - core/jquery.ui.slider
 
 widget:
-  version: 1.0
+  version: VERSION
   js:
     js/powertagging.widget.js: {}
   css:
@@ -32,7 +38,7 @@ widget:
     - core/jquery.ui.dialog
 
 widget_css_only:
-  version: 1.0
+  version: VERSION
   css:
     theme:
       css/powertagging.widget.css: {}
