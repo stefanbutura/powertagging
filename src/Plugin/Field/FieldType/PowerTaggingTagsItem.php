@@ -198,7 +198,9 @@ class PowerTaggingTagsItem extends FieldItemBase {
         'file_upload' => array(
           'max_file_size' => ($max_file_size > (2 * 1048576)) ? (2 * 1048576) : $max_file_size,
           'max_file_count' => 5
-        )
+        ),
+        'ac_add_matching_label' => FALSE,
+        'ac_add_context' => FALSE,
       ] + parent::defaultFieldSettings();
   }
 
@@ -269,6 +271,60 @@ class PowerTaggingTagsItem extends FieldItemBase {
       '#required' => TRUE,
     ];
 
+    // Add file upload settings if the content type has the appropriate fields.
+    $allowed_modules = array('file', 'media');
+    $state_fields_list = array();
+    foreach ($options as $field_name => $title) {
+      $field_storage = FieldStorageConfig::loadByName($field->getTargetEntityTypeId(), $field_name);
+      if (!is_null($field_storage)) {
+        if (in_array($field_storage->getTypeProvider(), $allowed_modules)) {
+          $state_fields_list[] = ':input[name="settings[fields][' . $field_name . ']"]';
+        }
+      }
+    }
+
+    if (!empty($state_fields_list)) {
+      $file_upload_settings = $field->getSetting('file_upload');
+      $state_fields = implode(', ', $state_fields_list);
+      $form['file_upload'] = array(
+        '#type' => 'details',
+        '#title' => t('File extraction settings'),
+        '#open' => FALSE,
+        '#states' => array(
+          'visible' => array($state_fields => array('checked' => TRUE)),
+        ),
+      );
+
+      // Add max file size to the form.
+      $max_file_size = floor(file_upload_max_size() / 1048576);
+      $max_file_size = ($max_file_size > 10) ? 10 : $max_file_size;
+      $file_size_options = array();
+      for ($i = 1; $i <= $max_file_size; $i++) {
+        $file_size_options[$i * 1048576] = $i . ' MB';
+      }
+      $default_max_file_size = (isset($file_upload_settings['max_file_size']) && $max_file_size > ($file_upload_settings['max_file_size'] / 1048576)) ? ($file_upload_settings['max_file_size'] / 1048576) : $max_file_size;
+      $form['file_upload']['max_file_size'] = array(
+        '#type' => 'select',
+        '#title' => t('Maximum file size for each attached file'),
+        '#description' => t('Only files below the specified value are used for the extraction.'),
+        '#options' => $file_size_options,
+        '#default_value' => ($default_max_file_size * 1048576),
+      );
+
+      // Add max file count to the form.
+      $file_count_options = array();
+      for ($i = 1; $i <= 10; $i++) {
+        $file_count_options[$i] = $i;
+      }
+      $form['file_upload']['max_file_count'] = array(
+        '#type' => 'select',
+        '#title' => t('Maximum number of files per node'),
+        '#description' => t('Only the specified number of files are used for the extraction per node.'),
+        '#options' => $file_count_options,
+        '#default_value' => (isset($file_upload_settings['max_file_count']) ? $file_upload_settings['max_file_count']: 5),
+      );
+    }
+
     // Limit settings.
     $form['limits'] = [
       '#type' => 'details',
@@ -333,59 +389,26 @@ class PowerTaggingTagsItem extends FieldItemBase {
       '#parents' => array('settings', 'custom_freeterms'),
     );
 
-    // Add file upload settings if the content type has the appropriate fields.
-    $allowed_modules = array('file', 'media');
-    $state_fields_list = array();
-    foreach ($options as $field_name => $title) {
-      $field_storage = FieldStorageConfig::loadByName($field->getTargetEntityTypeId(), $field_name);
-      if (!is_null($field_storage)) {
-        if (in_array($field_storage->getTypeProvider(), $allowed_modules)) {
-          $state_fields_list[] = ':input[name="settings[fields][' . $field_name . ']"]';
-        }
-      }
-    }
+    // Search settings.
+    $form['search'] = array(
+      '#type' => 'details',
+      '#title' => t('Search settings'),
+      '#open' => FALSE,
+    );
 
-    if (!empty($state_fields_list)) {
-      $file_upload_settings = $field->getSetting('file_upload');
-      $state_fields = implode(', ', $state_fields_list);
-      $form['file_upload'] = array(
-        '#type' => 'details',
-        '#title' => t('File extraction settings'),
-        '#open' => FALSE,
-        '#states' => array(
-          'visible' => array($state_fields => array('checked' => TRUE)),
-        ),
-      );
+    $form['search']['ac_add_matching_label'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Add the matching label to every suggestion in the drop down menu.'),
+      '#default_value' => $field->getSetting('ac_add_matching_label'),
+      '#parents' => array('settings', 'ac_add_matching_label'),
+    );
 
-      // Add max file size to the form.
-      $max_file_size = floor(file_upload_max_size() / 1048576);
-      $max_file_size = ($max_file_size > 10) ? 10 : $max_file_size;
-      $file_size_options = array();
-      for ($i = 1; $i <= $max_file_size; $i++) {
-        $file_size_options[$i * 1048576] = $i . ' MB';
-      }
-      $default_max_file_size = (isset($file_upload_settings['max_file_size']) && $max_file_size > ($file_upload_settings['max_file_size'] / 1048576)) ? ($file_upload_settings['max_file_size'] / 1048576) : $max_file_size;
-      $form['file_upload']['max_file_size'] = array(
-        '#type' => 'select',
-        '#title' => t('Maximum file size for each attached file'),
-        '#description' => t('Only files below the specified value are used for the extraction.'),
-        '#options' => $file_size_options,
-        '#default_value' => ($default_max_file_size * 1048576),
-      );
-
-      // Add max file count to the form.
-      $file_count_options = array();
-      for ($i = 1; $i <= 10; $i++) {
-        $file_count_options[$i] = $i;
-      }
-      $form['file_upload']['max_file_count'] = array(
-        '#type' => 'select',
-        '#title' => t('Maximum number of files per node'),
-        '#description' => t('Only the specified number of files are used for the extraction per node.'),
-        '#options' => $file_count_options,
-        '#default_value' => (isset($file_upload_settings['max_file_count']) ? $file_upload_settings['max_file_count']: 5),
-      );
-    }
+    $form['search']['ac_add_context'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Add the context (title of the concept scheme) to every suggestion in the drop down menu.'),
+      '#default_value' => $field->getSetting('ac_add_context'),
+      '#parents' => array('settings', 'ac_add_context'),
+    );
 
     return $form;
   }
@@ -412,7 +435,9 @@ class PowerTaggingTagsItem extends FieldItemBase {
       'fields' => $settings['fields'],
       'default_tags_field' => $settings['default_tags_field'],
       'limits' => $limits,
-      'file_upload' => $settings['file_upload']
+      'file_upload' => $settings['file_upload'],
+      'ac_add_matching_label' => $settings['ac_add_matching_label'],
+      'ac_add_context' => $settings['ac_add_context'],
     ];
   }
 

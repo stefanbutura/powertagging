@@ -43,6 +43,8 @@ class PowerTaggingController extends ControllerBase implements ContainerInjectio
           'uri' => $concept['uri'],
           'name' => $concept['prefLabel'],
           'value' => $concept['prefLabel'],
+          'matching_label' => isset($concept['matchingLabel']) ? $concept['matchingLabel'] : '',
+          'context' => isset($concept['conceptSchemes']) && !empty($concept['conceptSchemes']) ? $concept['conceptSchemes'][0]['title'] : '',
           'type' => 'concept',
         );
       }

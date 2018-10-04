@@ -142,11 +142,24 @@ class PowerTaggingTagsFormatter extends FormatterBase {
       /** @var Term $term */
       foreach ($terms as $term) {
         $uri = $term->get('field_uri')->getValue();
+        $alt_labels = [];
+        if ($term->hasField('field_alt_labels') && $term->get('field_alt_labels')->count()) {
+          //var_dump($term->get('field_alt_labels')->getValue()); exit;
+          foreach ($term->get('field_alt_labels')->getValue() as $alt_label) {
+            $alt_labels[] = $alt_label['value'];
+          }
+        }
+        $hidden_labels = [];
+        if ($term->hasField('field_hidden_labels') && $term->get('field_hidden_labels')->count()) {
+          foreach ($term->get('field_hidden_labels')->getValue() as $hidden_label) {
+            $hidden_labels[] = $hidden_label['value'];
+          }
+        }
         $tags_to_theme[] = array(
           'uri' => (!empty($uri) ? $uri[0]['uri'] : ''),
           'html' => \Drupal\Component\Utility\Html::escape($term->getName()),
-          'alt_labels' => (isset($settings['add_hidden_info']) && !empty($settings['add_hidden_info']['alt_labels']) && $term->hasField('field_alt_labels') && $term->get('field_alt_labels')->count() ? $term->get('field_alt_labels')->getString() : ''),
-          'hidden_labels' => (isset($settings['add_hidden_info']) && !empty($settings['add_hidden_info']['hidden_labels']) && $term->hasField('field_hidden_labels') && $term->get('field_hidden_labels')->count() ? $term->get('field_hidden_labels')->getString() : ''),
+          'alt_labels' => (isset($settings['add_hidden_info']) && !empty($settings['add_hidden_info']['alt_labels']) ? $alt_labels : []),
+          'hidden_labels' => (isset($settings['add_hidden_info']) && !empty($settings['add_hidden_info']['hidden_labels']) ? $hidden_labels : []),
         );
       }
       $powertagging_config = PowerTaggingConfig::load($this->getFieldSetting('powertagging_id'));

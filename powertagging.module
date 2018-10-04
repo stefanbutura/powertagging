@@ -513,7 +513,7 @@ function powertagging_entity_view_alter(array &$build, $entity, $display) {
       ->condition('entity_id', $entity_id)
       ->condition('language', $language);
     $cached_values = $cached_values_query->execute()
-      ->fetchAll(PDO::FETCH_ASSOC);
+      ->fetchAll(\PDO::FETCH_ASSOC);
 
     if (!empty($cached_values)) {
       // Show the entities if required.

@@ -441,6 +441,8 @@ class PowerTaggingTagsWidget extends WidgetBase {
         'corpus_id' => $powertagging_config['project']['corpus_id'],
         'max_file_size' => (isset($file_upload_settings['max_file_size']) ? $file_upload_settings['max_file_size'] : (2 * 1048576)),
         'max_file_count' => (isset($file_upload_settings['max_file_count']) ? $file_upload_settings['max_file_count'] : 5),
+        'ac_add_matching_label' => (!is_null($field->getSetting('ac_add_matching_label')) ? $field->getSetting('ac_add_matching_label') : FALSE),
+        'ac_add_context' => (!is_null($field->getSetting('ac_add_context')) ? $field->getSetting('ac_add_context') : FALSE),
       ],
       'selected_tags' => $selected_tags,
     ];

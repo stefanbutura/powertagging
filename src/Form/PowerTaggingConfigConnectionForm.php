@@ -253,7 +253,7 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
       '#type' => 'details',
       '#title' => t('4. Further restrictions'),
       '#description' => t('Note: A project has to be selected before any further restriction can be added.') . '<br />' . t('The restriction on the concept scheme level requires at least PoolParty version 6.2 to work properly.'),
-      '#open' => FALSE,
+      '#open' => (!$powertagging->isNew() && isset($settings['concept_scheme_restriction']) && !empty($settings['concept_scheme_restriction'])),
       '#suffix' => '</div>',
     );
 

@@ -446,6 +446,7 @@ class PowerTaggingConfigForm extends EntityForm {
   protected function getConnectionInfo() {
     /** @var PowerTaggingConfig $powertagging_config */
     $powertagging_config = $this->entity;
+    $settings = $powertagging_config->getConfig();
     /** @var SemanticConnectorPPServerConnection $connection */
     $connection = $powertagging_config->getConnection();
 
@@ -472,8 +473,23 @@ class PowerTaggingConfigForm extends EntityForm {
         $connection_markup .= '</div></div>';
       }
     }
+    $concept_scheme_labels = [];
+    if (isset($settings['concept_scheme_restriction']) && !empty($settings['concept_scheme_restriction'])) {
+      $concept_schemes = $powertagging_config->getConnection()->getApi('PPT')
+        ->getConceptSchemes($powertagging_config->getProjectId());
+
+      foreach ($concept_schemes as $concept_scheme) {
+        if (in_array($concept_scheme['uri'], $settings['concept_scheme_restriction'])) {
+          $concept_scheme_labels[] = $concept_scheme['title'];
+        }
+      }
+    }
+
     $connection_markup .= '<p id="sonr-webmining-connection-info">' . t('Connected PoolParty server') . ': <b>' . $connection->getTitle() . ' (' . $connection->getUrl() . ')</b><br />';
     $connection_markup .= t('Selected project') . ': <b>' . $project_title . '</b><br />';
+    if (!empty($concept_scheme_labels)) {
+      $connection_markup .= t('Selected concept schemes restrictions') . ': <b>' . implode('</b>, <b>', $concept_scheme_labels) . '</b><br />';
+    }
     $connection_markup .= Link::fromTextAndUrl(t('Change the connected PoolParty server or project'), Url::fromRoute('entity.powertagging.edit_form', ['powertagging' => $powertagging_config->id()]))->toString() . '</p>';
 
     return $connection_markup;
@@ -576,33 +592,33 @@ class PowerTaggingConfigForm extends EntityForm {
       ],
       'field_alt_labels' => [
         'field_name' => 'field_alt_labels',
-        'type' => 'text',
+        'type' => 'string',
         'label' => t('Alternative labels'),
-        'description' => t('A comma separated list of synonyms.'),
-        'cardinality' => 1,
+        'description' => t('A list of synonyms.'),
+        'cardinality' => -1,
         'field_settings' => [
-          'max_length' => 8192,
+          'max_length' => 1024,
         ],
         'required' => FALSE,
         'instance_settings' => [],
         'widget' => [
-          'type' => 'text_textfield',
+          'type' => 'string_textfield',
           'weight' => 4,
         ],
       ],
       'field_hidden_labels' => [
         'field_name' => 'field_hidden_labels',
-        'type' => 'text',
+        'type' => 'string',
         'label' => t('Hidden labels'),
-        'description' => t('A comma separated list of secondary variants of this term.'),
-        'cardinality' => 1,
+        'description' => t('A list of secondary variants of this term.'),
+        'cardinality' => -1,
         'field_settings' => [
-          'max_length' => 8192,
+          'max_length' => 1024,
         ],
         'required' => FALSE,
         'instance_settings' => [],
         'widget' => [
-          'type' => 'text_textfield',
+          'type' => 'string_textfield',
           'weight' => 5,
         ],
       ],

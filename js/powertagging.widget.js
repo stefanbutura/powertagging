@@ -37,6 +37,36 @@
               $(this).val('');
             }
           });
+
+          // Set the custom popup menu for the autocomplete field.
+          var autocomplete = $(this).data("ui-autocomplete");
+          var data_item = "ui-autocomplete-item";
+          if (typeof autocomplete === "undefined") {
+            autocomplete = $(this).data("autocomplete");
+            data_item = "item.autocomplete";
+          }
+          autocomplete._renderItem = function (ul, item_data) {
+            var field_id = $(this.element).data("drupal-selector").replace(/^edit-(.*)-powertagging-manual$/, "$1").replace(/-/g, "_");
+            var pt_field = drupalSettings.powertagging[field_id];
+
+            var item = $("<a>" + item_data.label + "</a>");
+            if (pt_field.settings.ac_add_matching_label && item_data.matching_label.length > 0) {
+              $("<div class='ui-menu-item-metadata'>")
+                .append("<span class='ui-menu-item-metadata-label'>" + Drupal.t("Matching label") + ":</span>")
+                .append("<span class='ui-menu-item-metadata-value'>" + item_data.matching_label + "</span>")
+                .appendTo(item);
+            }
+            if (pt_field.settings.ac_add_context && item_data.context.length > 0) {
+              $("<div class='ui-menu-item-metadata'>")
+                .append("<span class='ui-menu-item-metadata-label'>" + Drupal.t("Context") + ":</span>")
+                .append("<span class='ui-menu-item-metadata-value'>" + item_data.context + "</span>")
+                .appendTo(item);
+            }
+
+            return $("<li>").data(data_item, item_data).append(item).appendTo(ul);
+          };
+
+          // Manually add a new freeterm to the result if it is allowed.
           if (settings.settings.custom_freeterms) {
             $(this).keyup(function (e) {
               if (e.keyCode === 13) {
@@ -173,7 +203,8 @@
                 }, "json");
               });
 
-            browse_tags_area.find('.powertagging-browse-tags-search-ac').autocomplete({
+            var autocomplete_box = browse_tags_area.find('.powertagging-browse-tags-search-ac');
+            autocomplete_box.autocomplete({
               minLength: 2,
               source: drupalSettings.path.baseUrl + "powertagging/autocomplete-tags/" + pt_field.settings.powertagging_id + '/' + pt_field.settings.entity_language,
               focus: function (event, ui) {
@@ -181,14 +212,45 @@
                 return false;
               },
               select: function (event, ui) {
-                var powertagging_field = $(this).closest('.field--type-powertagging-tags');
-                var field_id = powertagging_field.attr("id").substr(5).replace(/-/g, "_");
+                var browse_tags_area = $(this).closest('.powertagging-browse-tags-area');
+                var field_id_full = browse_tags_area.attr('id').slice(0, -20);
+                var field_id = field_id_full.substr(5).replace(/-/g, "_");
                 if (ui.item) {
-                  powertagging_vm[field_id].updateConcept({id: ui.item.url});
+                  powertagging_vm[field_id].updateConcept({id: ui.item.uri});
                 }
+                $(this).val("");
                 return false;
               }
             });
+
+            // Set the custom popup menu for the autocomplete field.
+            var autocomplete = autocomplete_box.data("ui-autocomplete");
+            var data_item = "ui-autocomplete-item";
+            if (typeof autocomplete === "undefined") {
+              autocomplete = autocomplete_box.data("autocomplete");
+              data_item = "item.autocomplete";
+            }
+            autocomplete._renderItem = function (ul, item_data) {
+              var field_id_full = $(this.element).closest('.powertagging-browse-tags-area').attr('id').slice(0, -20);
+              var field_id = field_id_full.substr(5).replace(/-/g, "_");
+              var pt_field = drupalSettings.powertagging[field_id];
+
+              var item = $("<a>" + item_data.label + "</a>");
+              if (pt_field.settings.ac_add_matching_label && item_data.matching_label.length > 0) {
+                $("<div class='ui-menu-item-metadata'>")
+                  .append("<span class='ui-menu-item-metadata-label'>" + Drupal.t("Matching label") + ":</span>")
+                  .append("<span class='ui-menu-item-metadata-value'>" + item_data.matching_label + "</span>")
+                  .appendTo(item);
+              }
+              if (pt_field.settings.ac_add_context && item_data.context.length > 0) {
+                $("<div class='ui-menu-item-metadata'>")
+                  .append("<span class='ui-menu-item-metadata-label'>" + Drupal.t("Context") + ":</span>")
+                  .append("<span class='ui-menu-item-metadata-value'>" + item_data.context + "</span>")
+                  .appendTo(item);
+              }
+
+              return $("<li>").data(data_item, item_data).append(item).appendTo(ul);
+            };
           });
 
           var addConceptButton = function (vm, data) {

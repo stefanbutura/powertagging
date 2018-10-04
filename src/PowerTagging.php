@@ -405,7 +405,11 @@ class PowerTagging {
     $project_settings = $this->config_settings['project'];
     $suggested_concepts = [];
     if (!empty($project_settings['languages'][$langcode])) {
-      $suggested_concepts = $this->PPXApi->suggest($string, $project_settings['languages'][$langcode], $this->config->getProjectId());
+      $params = [];
+      if (isset($this->config_settings['concept_scheme_restriction']) && !empty($this->config_settings['concept_scheme_restriction'])) {
+        $params['conceptSchemeFilters'] = $this->config_settings['concept_scheme_restriction'];
+      }
+      $suggested_concepts = $this->PPXApi->suggest($string, $project_settings['languages'][$langcode], $this->config->getProjectId(), $params);
       self::addTermId($suggested_concepts, $project_settings['taxonomy_id'], 'concepts', $langcode);
     }
     $this->result = $suggested_concepts;
@@ -827,22 +831,20 @@ class PowerTagging {
     }
 
     // Set alternative labels.
-    if (isset($concept_details->altLabels)) {
-      $alt_labels = implode(',', $concept_details->altLabels);
+    if (isset($concept_details->altLabels) && !empty($concept_details->altLabels)) {
+      $term->get('field_alt_labels')->setValue($concept_details->altLabels);
     }
     else {
-      $alt_labels = '';
+      $term->get('field_alt_labels')->setValue(NULL);
     }
-    $term->get('field_alt_labels')->setValue($alt_labels);
 
     // Set hidden labels.
-    if (isset($concept_details->hiddenLabels)) {
-      $hidden_labels = implode(',', $concept_details->hiddenLabels);
+    if (isset($concept_details->hiddenLabels) && !empty($concept_details->hiddenLabels)) {
+      $term->get('field_hidden_labels')->setValue($concept_details->hiddenLabels);
     }
     else {
-      $hidden_labels = '';
+      $term->get('field_hidden_labels')->setValue(NULL);
     }
-    $term->get('field_hidden_labels')->setValue($hidden_labels);
 
     // Set the scope notes.
     if (isset($concept_details->scopeNotes) && !empty($concept_details->scopeNotes)) {
@@ -1324,6 +1326,8 @@ class PowerTagging {
       'default_tags_field' => (isset($field_settings['settings']['default_tags_field']) ? $field_settings['settings']['default_tags_field'] : ''),
       'max_file_size' => (isset($field_settings['settings']['file_upload']['max_file_size']) ? $field_settings['settings']['file_upload']['max_file_size'] : (2 * 1048576)),
       'max_file_count' => (isset($field_settings['settings']['file_upload']['max_file_count']) ? $field_settings['settings']['file_upload']['max_file_count'] : 5),
+      'ac_add_matching_label' => (isset($field_settings['ac_add_matching_label']) ? $field_settings['ac_add_matching_label'] : FALSE),
+      'ac_add_context' => (isset($field_settings['ac_add_context']) ? $field_settings['ac_add_context'] : FALSE),
     );
 
     // Merge in the additional settings.
