@@ -947,15 +947,23 @@ class PowerTagging {
 
       // Put the term into the "Concepts" or "Free terms" list.
       // Delete old hierarchy values.
-      \Drupal::database()->delete('taxonomy_term_hierarchy')
-        ->condition('tid', $term->id())
+      \Drupal::database()->delete('taxonomy_term__parent')
+        ->condition('entity_id', $term->id())
         ->execute();
 
       // Insert new hierarchy values.
       $parent_id = !empty($uri) ? $parent['concepts'] : $parent['freeterms'];
-      \Drupal::database()->insert('taxonomy_term_hierarchy')
-        ->fields(['tid', 'parent'])
-        ->values(['tid' => $term->id(), 'parent' => $parent_id])
+      \Drupal::database()->insert('taxonomy_term__parent')
+        ->fields(['bundle', 'deleted', 'entity_id', 'revision_id', 'langcode', 'delta', 'parent_target_id'])
+        ->values([
+          'bundle' => $term->bundle(),
+          'deleted' => 0,
+          'entity_id' => $term->id(),
+          'revision_id' => $term->id(),
+          'langcode' => $term->language()->getId(),
+          'delta' => 0,
+          'parent_target_id' => (int) $parent_id
+        ])
         ->execute();
 
       $term_ids[$new_term] = $term->id();
