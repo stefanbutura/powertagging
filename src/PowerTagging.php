@@ -1639,4 +1639,18 @@ class PowerTagging {
         break;
     }
   }
+
+  /**
+   * Creates a machine readable name from a human readable name.
+   *
+   * @param string $name
+   *   The human readable name.
+   *
+   * @return string
+   *   The machine readable name.
+   */
+  public static function createMachineName($name) {
+    $name = strtolower($name);
+    return substr(preg_replace(array('@[^a-z0-9_]+@', '@_+@'), '_', $name), 0, 32);
+  }
 }

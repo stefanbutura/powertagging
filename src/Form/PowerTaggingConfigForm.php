@@ -6,6 +6,7 @@
  */
 
 namespace Drupal\powertagging\Form;
+use Drupal\Core\Entity\Element\EntityAutocomplete;
 use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Link;
@@ -14,6 +15,7 @@ use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\link\LinkItemInterface;
 use Drupal\powertagging\Entity\PowerTaggingConfig;
+use Drupal\powertagging\PowerTagging;
 use Drupal\pp_taxonomy_manager\Entity\PPTaxonomyManagerConfig;
 use Drupal\semantic_connector\Entity\SemanticConnectorPPServerConnection;
 use Drupal\taxonomy\Entity\Vocabulary;
@@ -191,6 +193,8 @@ class PowerTaggingConfigForm extends EntityForm {
         '#target_type' => 'taxonomy_vocabulary',
         '#title' => t('Select or enter a new vocabulary'),
         '#default_value' => (!empty($config['project']['taxonomy_id']) ? Vocabulary::load($config['project']['taxonomy_id']) : ''),
+        //'#validated' => TRUE,
+        '#element_validate' => [[$this, 'validateTaxonomy']],
         '#states' => [
           'required' => ['#edit-project-settings-no-language-selected' => array('checked' => FALSE)],
           'disabled' => $states,
@@ -329,6 +333,48 @@ class PowerTaggingConfigForm extends EntityForm {
     ];
 
     return $form;
+  }
+
+  // The validation handler for the vocabulary selection field.
+  public function validateTaxonomy(array &$element, FormStateInterface $form_state, array &$complete_form) {
+    $taxonomy_name = trim(\Drupal\Component\Utility\Html::escape($element['#value']));
+    // Do the custom element validation.
+    EntityAutocomplete::validateEntityAutocomplete($element, $form_state, $complete_form);
+
+    // Create a new vocabulary if required.
+    if (!empty($taxonomy_name) && is_null($form_state->getValue(['project_settings', 'taxonomy_id']))) {
+      // Remove potential Element validation errors.
+      $form_errors = $form_state->getErrors();
+      $form_state->clearErrors();
+      foreach ($form_errors as $name => $message) {
+        if ($name != 'project_settings][taxonomy_id') {
+          $form_state->setErrorByName($name, $message);
+        }
+      }
+
+      /** @var PowerTaggingConfig $powertagging_config */
+      $powertagging_config = $this->entity;
+
+      // Check if the new taxonomy already exists.
+      $machine_name = PowerTagging::createMachineName($taxonomy_name);
+      $taxonomy = Vocabulary::load($machine_name);
+
+      if (!$taxonomy) {
+        // Create the new vocabulary.
+        $taxonomy = Vocabulary::create(array(
+          'vid' => $machine_name,
+          'machine_name' => $machine_name,
+          'description' => substr(t('Automatically created by PowerTagging configuration') . ' "' . $powertagging_config->getTitle() . '".', 0, 128),
+          'name' => $taxonomy_name,
+        ));
+        $taxonomy->save();
+      }
+      else {
+        $form_state->setError($element, t('A taxonomy with the same machine name already exists.'));
+      }
+
+      $form_state->setValueForElement($element, $machine_name);
+    }
   }
 
   /**
@@ -709,5 +755,4 @@ class PowerTaggingConfigForm extends EntityForm {
       FieldConfig::create($instance)->save();
     }
   }
-
 }
