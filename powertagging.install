@@ -223,3 +223,21 @@ function _powertagging_update_labels(&$sandbox, $field_name) {
     $sandbox['#finished'] = 1;
   }
 }
+
+/**
+ * Adds remaining fields to PowerTagging configurations if necessary.
+ */
+function powertagging_update_8105() {
+  $configs = \Drupal\powertagging\Entity\PowerTaggingConfig::loadMultiple();
+  /** @var \Drupal\powertagging\Entity\PowerTaggingConfig $config */
+  foreach ($configs as $config) {
+    $settings = $config->getConfig();
+    $taxonomy_id = isset($settings['project']['taxonomy_id']) ? $settings['project']['taxonomy_id'] : '';
+    if (!empty($taxonomy_id)) {
+      $vocabulary = \Drupal\taxonomy\Entity\Vocabulary::load($taxonomy_id);
+      if (!empty($vocabulary)) {
+        \Drupal\powertagging\Form\PowerTaggingConfigForm::addVocabularyFields($vocabulary);
+      }
+    }
+  }
+}

@@ -436,7 +436,7 @@ class PowerTaggingConfigForm extends EntityForm {
         $vocabulary->delete();
       }
       else {
-        $this->addVocabularyFields($vocabulary);
+        self::addVocabularyFields($vocabulary);
       }
     }
 
@@ -617,7 +617,7 @@ class PowerTaggingConfigForm extends EntityForm {
     );
   }
 
-  protected function addVocabularyFields(Vocabulary $vocabulary) {
+  public static function addVocabularyFields(Vocabulary $vocabulary) {
     $fields = [
       'field_uri' => [
         'field_name' => 'field_uri',
@@ -718,8 +718,8 @@ class PowerTaggingConfigForm extends EntityForm {
       ],
     ];
     foreach ($fields as $field) {
-      $this->createVocabularyField($field);
-      $this->addFieldtoVocabulary($field, $vocabulary);
+      self::createVocabularyField($field);
+      self::addFieldtoVocabulary($field, $vocabulary);
 
       // Set the widget data.
       entity_get_form_display('taxonomy_term', $vocabulary->id(), 'default')
@@ -728,7 +728,7 @@ class PowerTaggingConfigForm extends EntityForm {
     }
   }
 
-  protected function createVocabularyField(array $field) {
+  protected static function createVocabularyField(array $field) {
     if (is_null(FieldStorageConfig::loadByName('taxonomy_term', $field['field_name']))) {
       $new_field = [
         'field_name' => $field['field_name'],
@@ -741,7 +741,7 @@ class PowerTaggingConfigForm extends EntityForm {
     }
   }
 
-  protected function addFieldtoVocabulary(array $field, Vocabulary $vocabulary) {
+  protected static function addFieldtoVocabulary(array $field, Vocabulary $vocabulary) {
     if (is_null(FieldConfig::loadByName('taxonomy_term', $vocabulary->id(), $field['field_name']))) {
       $instance = [
         'field_name' => $field['field_name'],
