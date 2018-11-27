@@ -39,6 +39,9 @@ class PowerTaggingTagsWidget extends WidgetBase {
   public function formElement(FieldItemListInterface $items, $delta, array $element, array &$form, FormStateInterface $form_state) {
     $storage = $form_state->getStorage();
     $langcode = isset($storage['langcode']) ? $storage['langcode'] : '';
+    $field_settings = $this->getFieldSettings();
+    $powertagging_config = PowerTaggingConfig::load($field_settings['powertagging_id']);
+    $powertagging_config_settings = $powertagging_config->getConfig();
 
     // Show the legend.
     $legend_types = [
@@ -65,11 +68,9 @@ class PowerTaggingTagsWidget extends WidgetBase {
         $tag_ids[] = $item_value['target_id'] . '#' . $item_value['score'];
       }
     }
-
     $tag_string = implode(',', $tag_ids);
 
     // Get the default tags if required.
-    $field_settings = $this->getFieldSettings();
     $default_terms = [];
     if (empty($tag_ids) && !empty($field_settings['default_tags_field'])) {
       $tag_entity = $items->getEntity();
@@ -89,7 +90,12 @@ class PowerTaggingTagsWidget extends WidgetBase {
         $terms = Term::loadMultiple($default_tag_ids);
         /** @var Term $term */
         foreach ($terms as $term) {
-          $default_terms[] = $term->getName();
+          // The term doesn't have to be created.
+          /*if ($term->getVocabularyId() === $powertagging_config_settings['project']['taxonomy_id']) {
+            $tag_ids[] = $term->id() . '#100';
+          }*/
+
+          // The term has to be created in the correct taxonomy.
           if ($term->hasField('field_uri') && $term->get('field_uri')->count()) {
             $default_terms[] = $term->getName() . '|' . $term->get('field_uri')->getString();
           }
@@ -138,9 +144,6 @@ class PowerTaggingTagsWidget extends WidgetBase {
         'class' => ['powertagging_autocomplete_tags', 'form-autocomplete'],
       ],
     ];
-
-    $powertagging_config = PowerTaggingConfig::load($field_settings['powertagging_id']);
-    $powertagging_config_settings = $powertagging_config->getConfig();
 
     // Check if the Visual Mapper has to be added.
     $add_visual_mapper = FALSE;
@@ -369,27 +372,29 @@ class PowerTaggingTagsWidget extends WidgetBase {
       foreach ($tag_ids as $tag) {
         list($tag_id, $score) = explode('#', $tag);
         $term = Term::load($tag_id);
-        $selected_tags[] = [
-          'tid' => $term->id(),
-          'uri' => $term->get('field_uri')->getString(),
-          'label' => $term->getName(),
-          'type' => empty($term->get('field_uri')
-            ->getString()) ? 'freeterm' : 'concept',
-          'score' => $score,
-        ];
+        if (!is_null($term)) {
+          $selected_tags[] = [
+            'tid' => $term->id(),
+            'uri' => $term->get('field_uri')->getString(),
+            'label' => $term->getName(),
+            'type' => empty($term->get('field_uri')
+              ->getString()) ? 'freeterm' : 'concept',
+            'score' => $score,
+          ];
+        }
       }
     }
 
     // Set the default term if available.
     if (!empty($default_terms)) {
       foreach ($default_terms as $term) {
-        list($term, $score) = explode('#', $term);
+        list($label, $uri) = explode('|', $term);
         $selected_tags[] = [
           'tid' => 0,
-          'uri' => '',
-          'label' => $term,
-          'type' => 'freeterm',
-          'score' => $score,
+          'uri' => $uri,
+          'label' => $label,
+          'type' => (empty($uri) ? 'freeterm' : 'concept'),
+          'score' => 100,
         ];
       }
     }

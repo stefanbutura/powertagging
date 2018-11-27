@@ -1331,9 +1331,9 @@ class PowerTagging {
       'allowed_languages' => $allowed_langcodes,
       'fields' => $tag_fields,
       'skip_tagged_content' => (isset($settings['skip_tagged_content']) ? $settings['skip_tagged_content'] : FALSE),
-      'default_tags_field' => (isset($field_settings['settings']['default_tags_field']) ? $field_settings['settings']['default_tags_field'] : ''),
-      'max_file_size' => (isset($field_settings['settings']['file_upload']['max_file_size']) ? $field_settings['settings']['file_upload']['max_file_size'] : (2 * 1048576)),
-      'max_file_count' => (isset($field_settings['settings']['file_upload']['max_file_count']) ? $field_settings['settings']['file_upload']['max_file_count'] : 5),
+      'default_tags_field' => (isset($field_settings['default_tags_field']) ? $field_settings['default_tags_field'] : ''),
+      'max_file_size' => (isset($field_settings['file_upload']['max_file_size']) ? $field_settings['file_upload']['max_file_size'] : (2 * 1048576)),
+      'max_file_count' => (isset($field_settings['file_upload']['max_file_count']) ? $field_settings['file_upload']['max_file_count'] : 5),
       'ac_add_matching_label' => (isset($field_settings['ac_add_matching_label']) ? $field_settings['ac_add_matching_label'] : FALSE),
       'ac_add_context' => (isset($field_settings['ac_add_context']) ? $field_settings['ac_add_context'] : FALSE),
     );

@@ -144,7 +144,6 @@ class PowerTaggingTagsFormatter extends FormatterBase {
         $uri = $term->get('field_uri')->getValue();
         $alt_labels = [];
         if ($term->hasField('field_alt_labels') && $term->get('field_alt_labels')->count()) {
-          //var_dump($term->get('field_alt_labels')->getValue()); exit;
           foreach ($term->get('field_alt_labels')->getValue() as $alt_label) {
             $alt_labels[] = $alt_label['value'];
           }
