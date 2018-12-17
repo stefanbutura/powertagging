@@ -66,29 +66,6 @@ class PowerTaggingConfigForm extends EntityForm {
 
       $action_tag = Url::fromRoute('entity.powertagging.tag_content', ['powertagging_config' => $powertagging_config->id()], $link_options);
       $action_update_taxonomy = Url::fromRoute('entity.powertagging.update_vocabulary', ['powertagging_config' => $powertagging_config->id()], $link_options);
-      if (\Drupal::moduleHandler()->moduleExists('pp_taxonomy_manager')) {
-        // Check if this taxonomy / project combination is also used by a
-        // taxonomy manager configuration.
-        foreach ($projects as $project) {
-          if ($project['uuid'] == $powertagging_config->getProjectId()) {
-            $taxonomy_manager_configs = PPTaxonomyManagerConfig::loadMultiple();
-            /** @var PPTaxonomyManagerConfig $taxonomy_manager_config */
-            foreach ($taxonomy_manager_configs as $taxonomy_manager_config) {
-              if ($powertagging_config->getConnectionId() == $taxonomy_manager_config->getConnectionId()) {
-                $settings = $taxonomy_manager_config->getConfig();
-                foreach ($settings['taxonomies'] as $taxonomy_manager_project_id) {
-                  if ($taxonomy_manager_project_id == $project['uuid']) {
-                    $action_update_taxonomy = Url::fromRoute('entity.pp_taxonomy_manager.powertagging_taxonomy_update', ['config' => $taxonomy_manager_config->id(), 'powertagging_config' => $powertagging_config->id()]);
-                    break;
-                  }
-                }
-                break;
-              }
-            }
-            break;
-          }
-        }
-      }
 
       $form['action_links'] = [
         '#markup' => '
