@@ -4,7 +4,7 @@ powertagging_corpus.overview:
     _form: '\Drupal\powertagging_corpus\Form\PowerTaggingCorpusOverviewForm'
     _title: 'Settings for PowerTagging Corpus Management'
   requirements:
-    _permission: 'administer powertagging'
+    _permission: 'administer corpus management'
 
 powertagging_corpus.add_content_to_corpus:
   path: '/admin/config/semantic-drupal/powertagging/powertagging-corpus/add-content-to-corpus/{connection}/{project_id}/{corpus_id}'
@@ -12,7 +12,7 @@ powertagging_corpus.add_content_to_corpus:
     _form: '\Drupal\powertagging_corpus\Form\PowerTaggingCorpusAddContentForm'
     _title: 'Push content into a corpus'
   requirements:
-    _permission: 'administer powertagging'
+    _permission: 'administer corpus management'
   options:
     parameters:
       connection:
@@ -24,7 +24,7 @@ powertagging_corpus.analyze_corpus:
     _form: '\Drupal\powertagging_corpus\Form\PowerTaggingCorpusAnalyzeCorpusForm'
     _title: 'Perform an analysis on a corpus'
   requirements:
-    _permission: 'administer powertagging'
+    _permission: 'administer corpus management'
   options:
     parameters:
       connection:
