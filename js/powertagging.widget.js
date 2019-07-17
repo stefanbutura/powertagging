@@ -789,7 +789,7 @@
        *   The tag object.
        */
       ExtractionContainer.prototype.disableTag = function (tag) {
-        if (tag.tid > 0) {
+        if (parseInt(tag.tid) > 0) {
           $(this.field + ' .powertagging-tag[data-tid="' + tag.tid + '"]').addClass("disabled");
         }
         else {
@@ -804,7 +804,7 @@
        *   The tag object.
        */
       ExtractionContainer.prototype.enableTag = function (tag) {
-        if (tag.tid > 0) {
+        if (parseInt(tag.tid) > 0) {
           $(this.field + ' .powertagging-tag[data-tid="' + tag.tid + '"]').removeClass("disabled");
         }
         else {
@@ -820,7 +820,7 @@
        */
       ExtractionContainer.prototype.getHighestScore = function (tag) {
         var tags = [];
-        if (tag.tid > 0) {
+        if (parseInt(tag.tid) > 0) {
           tags = $(this.field + ' .powertagging-tag[data-tid="' + tag.tid + '"]');
         }
         else {
@@ -877,8 +877,8 @@
         var field = this.field;
 
         // Only add tags, that are not already inside the results area.
-        if ((tag.tid > 0 && $(field + ' .powertagging-tag[data-tid="' + tag.tid + '"]').length === 0) ||
-            (tag.tid === 0 && ($(field + ' .powertagging-tag[data-label="' + tag.label + '"]').length === 0 || tag.uri !== ""))) {
+        if ((parseInt(tag.tid) > 0 && $(field + ' .powertagging-tag[data-tid="' + tag.tid + '"]').length === 0) ||
+            (parseInt(tag.tid) === 0 && ($(field + ' .powertagging-tag[data-label="' + tag.label + '"]').length === 0 || tag.uri !== ""))) {
 
           // Add a new list if this is the first tag to add.
           if ($(field + " ul").length === 0) {
@@ -919,7 +919,7 @@
         var field = this.field;
 
         // Remove tag from the list.
-        if (tag.tid > 0) {
+        if (parseInt(tag.tid) > 0) {
           $(field + ' .powertagging-tag[data-tid="' + tag.tid + '"]').parent("li").remove();
         }
         else {
