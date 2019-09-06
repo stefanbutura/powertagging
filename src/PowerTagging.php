@@ -1232,7 +1232,7 @@ class PowerTagging {
           default:
             // If the entity type is not supported, throw an error and continue.
             drupal_set_message(t('Entity type "%entitytype" is not supported.', ['%entitytype' => $field_instance->getTargetEntityTypeId()]), 'warning');
-            continue;
+            continue 2;
         }
         if ($add_fieldname) {
           $option_title .= ' (' . $field_instance->getName() . ')';
