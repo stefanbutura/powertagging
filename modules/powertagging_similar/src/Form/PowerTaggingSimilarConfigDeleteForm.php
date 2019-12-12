@@ -45,7 +45,7 @@ class PowerTaggingSimilarConfigDeleteForm extends EntityConfirmFormBase{
     $entity = $this->getEntity();
     $entity->delete();
 
-    drupal_set_message(t('PowerTagging SeeAlso widget "%title" has been deleted.', array('%title' => $entity->getTitle())));
+    \Drupal::messenger()->addMessage(t('PowerTagging SeeAlso widget "%title" has been deleted.', array('%title' => $entity->getTitle())));
     $form_state->setRedirect('entity.powertagging.collection');
   }
 }

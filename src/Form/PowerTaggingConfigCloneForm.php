@@ -55,7 +55,7 @@ class PowerTaggingConfigCloneForm extends EntityConfirmFormBase{
       $entity->getConfig()
     );
 
-    drupal_set_message(t('PowerTagging configuration "%title" was successfully cloned.', array('%title' => $entity->getTitle())));
+    \Drupal::messenger()->addMessage(t('PowerTagging configuration "%title" was successfully cloned.', array('%title' => $entity->getTitle())));
     $form_state->setRedirect('entity.powertagging.edit_config_form', array('powertagging' => $new_entity->id()));
   }
 }

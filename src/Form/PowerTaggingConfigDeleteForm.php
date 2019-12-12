@@ -56,7 +56,7 @@ class PowerTaggingConfigDeleteForm extends EntityConfirmFormBase {
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $this->entity->delete();
 
-    drupal_set_message(t('PowerTagging configuration "%title" has been deleted.', array('%title' => $this->entity->getTitle())));
+    \Drupal::messenger()->addMessage(t('PowerTagging configuration "%title" has been deleted.', array('%title' => $this->entity->getTitle())));
     $form_state->setRedirectUrl($this->getCancelUrl());
   }
 

@@ -317,13 +317,15 @@ class PowerTaggingTagsWidget extends WidgetBase {
 
         if (!empty($existing_terms_by_uri)) {
           $concepts_details = $powertagging->getConceptsDetails(array_keys($existing_terms_by_uri), $langcode);
-          foreach ($concepts_details as $concept_detail) {
-            if (isset($existing_terms_by_uri[$concept_detail['uri']])) {
-              $existing_term = $existing_terms_by_uri[$concept_detail['uri']];
-              $term_data_changed = $powertagging->updateTaxonomyTermDetails($existing_term, (object) $concept_detail);
-              // Only save the taxonomy term if any information has changed.
-              if ($term_data_changed) {
-                $existing_term->save();
+          if (is_array($concepts_details)) {
+            foreach ($concepts_details as $concept_detail) {
+              if (isset($existing_terms_by_uri[$concept_detail['uri']])) {
+                $existing_term = $existing_terms_by_uri[$concept_detail['uri']];
+                $term_data_changed = $powertagging->updateTaxonomyTermDetails($existing_term, (object) $concept_detail);
+                // Only save the taxonomy term if any information has changed.
+                if ($term_data_changed) {
+                  $existing_term->save();
+                }
               }
             }
           }

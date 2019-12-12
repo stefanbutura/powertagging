@@ -205,10 +205,8 @@ function _powertagging_update_labels(&$sandbox, $field_name) {
       }
     }
 
-    // Show progress message if in drush.
-    if (function_exists('drush_log')) {
-      drush_log(t('Finished updating @done / @max labels for @field.', array('@done' => $sandbox['progress'], '@max' => $sandbox['max_items'], '@field' => $field_name)), 'success');
-    }
+    // Show progress message.
+    \Drupal::logger(t('Finished updating @done / @max labels for @field.', array('@done' => $sandbox['progress'], '@max' => $sandbox['max_items'], '@field' => $field_name)))->info('success');
   }
   // All labels were changed.
   else {

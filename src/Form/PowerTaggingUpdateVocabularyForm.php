@@ -205,7 +205,7 @@ class PowerTaggingUpdateVocabularyForm extends FormBase {
    * Batch 'finished' callback used by PowerTagging update vocabulary batch.
    */
   public static function updateVocabularyBatchFinished($success, $results, $operations) {
-    drupal_set_message(t('Successfully finished updating %totalentities taxonomy terms. (Updated: %updatedentities, Skipped: %skippedentities)', [
+    \Drupal::messenger()->addMessage(t('Successfully finished updating %totalentities taxonomy terms. (Updated: %updatedentities, Skipped: %skippedentities)', [
       '%totalentities' => $results['processed'],
       '%updatedentities' => $results['updated'],
       '%skippedentities' => $results['skipped'],

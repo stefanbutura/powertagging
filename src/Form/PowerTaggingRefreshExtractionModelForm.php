@@ -93,7 +93,7 @@ class PowerTaggingRefreshExtractionModelForm extends ConfirmFormBase {
 
     $result = $ppt_api->refreshExtractionModel($entity->getProjectId());
     if ($result['success']) {
-      drupal_set_message(t('Successfully refreshed the extraction model for project "%projectname".', array('%projectname' => $project_label)));
+      \Drupal::messenger()->addMessage(t('Successfully refreshed the extraction model for project "%projectname".', array('%projectname' => $project_label)));
 
       // If there are any global notifications and they could be caused by a missing
       // sync, refresh the notifications.
@@ -106,7 +106,7 @@ class PowerTaggingRefreshExtractionModelForm extends ConfirmFormBase {
       }
     }
     else {
-      drupal_set_message(t('An error occurred while refreshing the extraction model for project "%projectname".', array('%projectname' => $project_label)) . ((isset($result['message']) && !empty($result['message'])) ? ' message: ' . $result['message'] : ''), 'error');
+      \Drupal::messenger()->addMessage(t('An error occurred while refreshing the extraction model for project "%projectname".', array('%projectname' => $project_label)) . ((isset($result['message']) && !empty($result['message'])) ? ' message: ' . $result['message'] : ''), 'error');
     }
 
     $form_state->setRedirect('entity.powertagging.edit_config_form', array('powertagging' => $entity->id()));

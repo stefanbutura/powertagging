@@ -289,11 +289,11 @@ class PowerTaggingCorpusAddContentForm extends FormBase {
             }
           }
         }
-        drupal_set_message(t('The selected corpus could not be found in the PoolParty project.'), 'error');
+        \Drupal::messenger()->addMessage(t('The selected corpus could not be found in the PoolParty project.'), 'error');
         break;
       }
     }
-    drupal_set_message(t('The selected project could not be found on the PoolParty server.'), 'error');
+    \Drupal::messenger()->addMessage(t('The selected project could not be found on the PoolParty server.'), 'error');
     $form_state->setRedirectUrl(Url::fromRoute('powertagging_corpus.overview'));
 
     return $form;

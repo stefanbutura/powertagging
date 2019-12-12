@@ -6,6 +6,7 @@
 
 namespace Drupal\powertagging\Plugin\Field\FieldType;
 
+use Drupal\Component\Utility\Environment;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemBase;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
@@ -163,7 +164,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
       $url = URL::fromRoute('entity.powertagging.collection');
       $description = t('No PowerTagging configuration found.') . '<br />';
       $description .= t('Please create it first in the <a href="@url">PowerTagging configuration</a> area.', ['@url' => $url->toString()]);
-      drupal_set_message(t('No PowerTagging configuration found for the selection below.'), 'error');
+      \Drupal::messenger()->addMessage(t('No PowerTagging configuration found for the selection below.'), 'error');
     }
 
     $element['powertagging_id'] = [
@@ -184,7 +185,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
    * {@inheritdoc}
    */
   public static function defaultFieldSettings() {
-    $max_file_size = file_upload_max_size();
+    $max_file_size = Environment::getUploadMaxSize();
 
     return [
         'include_in_tag_glossary' => FALSE,
@@ -296,7 +297,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
       );
 
       // Add max file size to the form.
-      $max_file_size = floor(file_upload_max_size() / 1048576);
+      $max_file_size = floor(Environment::getUploadMaxSize() / 1048576);
       $max_file_size = ($max_file_size > 10) ? 10 : $max_file_size;
       $file_size_options = array();
       for ($i = 1; $i <= $max_file_size; $i++) {

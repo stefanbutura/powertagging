@@ -34,7 +34,7 @@ class PowerTaggingConfigFixedConnectionAddForm extends FormBase {
    */
   public function buildForm(array $form, FormStateInterface $form_state, $connection = NULL, $project_id = '') {
     if (is_null($connection) || empty($project_id)) {
-      drupal_set_message(t('An incorrect PoolParty connection ID or project ID was given.'), 'error');
+      \Drupal::messenger()->addMessage(t('An incorrect PoolParty connection ID or project ID was given.'), 'error');
       $form_state->setRedirectUrl(Url::fromRoute('semantic_connector.overview'));
     }
     else {
@@ -48,7 +48,7 @@ class PowerTaggingConfigFixedConnectionAddForm extends FormBase {
       }
 
       if (is_null($project)) {
-        drupal_set_message(t('The given project ID could not be found on the PoolParty server.'), 'error');
+        \Drupal::messenger()->addMessage(t('The given project ID could not be found on the PoolParty server.'), 'error');
         $form_state->setRedirectUrl(Url::fromRoute('semantic_connector.overview'));
       }
       else {
@@ -104,7 +104,7 @@ class PowerTaggingConfigFixedConnectionAddForm extends FormBase {
           $connection->id()
         );
 
-        drupal_set_message(t('PowerTagging configuration "%title" has been created.', array('%title' => $new_powertagging_config->getTitle())));
+        \Drupal::messenger()->addMessage(t('PowerTagging configuration "%title" has been created.', array('%title' => $new_powertagging_config->getTitle())));
         // Drupal Goto to forward a destination if one is available.
         if (isset($_GET['destination'])) {
           $destination = $_GET['destination'];

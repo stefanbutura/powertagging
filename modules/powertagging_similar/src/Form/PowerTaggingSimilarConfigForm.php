@@ -256,10 +256,10 @@ class PowerTaggingSimilarConfigForm extends EntityForm {
     if ($is_new) {
       // Configuration entities need an ID manually set.
       $entity->set('id', SemanticConnector::createUniqueEntityMachineName('powertagging_similar', $entity->get('title')));
-      drupal_set_message(t('Powertagging SeeAlso widget %title has been created.', array('%title' => $entity->get('title'))));
+      \Drupal::messenger()->addMessage(t('Powertagging SeeAlso widget %title has been created.', array('%title' => $entity->get('title'))));
     }
     else {
-      drupal_set_message(t('Updated Powertagging SeeAlso widget %title.',
+      \Drupal::messenger()->addMessage(t('Updated Powertagging SeeAlso widget %title.',
         array('%title' => $entity->get('title'))));
     }
 

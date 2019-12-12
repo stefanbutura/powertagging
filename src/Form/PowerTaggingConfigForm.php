@@ -447,13 +447,13 @@ class PowerTaggingConfigForm extends EntityForm {
 
     switch ($status) {
       case SAVED_NEW:
-        drupal_set_message($this->t('PowerTagging configuration %title has been created.', [
+        \Drupal::messenger()->addMessage($this->t('PowerTagging configuration %title has been created.', [
           '%title' => $powertagging_config->getTitle(),
         ]));
         break;
 
       default:
-        drupal_set_message($this->t('PowerTagging configuration %title has been updated.', [
+        \Drupal::messenger()->addMessage($this->t('PowerTagging configuration %title has been updated.', [
           '%title' => $powertagging_config->getTitle(),
         ]));
     }
@@ -699,7 +699,7 @@ class PowerTaggingConfigForm extends EntityForm {
       self::addFieldtoVocabulary($field, $vocabulary);
 
       // Set the widget data.
-      entity_get_form_display('taxonomy_term', $vocabulary->id(), 'default')
+      \Drupal::service('entity_display.repository')->getFormDisplay('taxonomy_term', $vocabulary->id())
         ->setComponent($field['field_name'], $field['widget'])
         ->save();
     }

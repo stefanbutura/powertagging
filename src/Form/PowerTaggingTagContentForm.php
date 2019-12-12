@@ -153,7 +153,7 @@ class PowerTaggingTagContentForm extends FormBase {
 
       // If the entity type is not supported, throw an error and continue.
       if (!in_array($entity_type_id, ['node', 'user', 'taxonomy_term'])) {
-        drupal_set_message(t('Entity type "%entitytype" is not supported in bulk tagging.', ['%entitytype' => $entity_type_id]), 'error');
+        \Drupal::messenger()->addMessage(t('Entity type "%entitytype" is not supported in bulk tagging.', ['%entitytype' => $entity_type_id]), 'error');
         continue;
       }
 
@@ -303,7 +303,7 @@ class PowerTaggingTagContentForm extends FormBase {
         '%skipped_entities' => $results['skipped'],
         '%error_entities' => self::createErrorList($results['error']),
       ]);
-      drupal_set_message(new FormattableMarkup($message, array()));
+      \Drupal::messenger()->addMessage(new FormattableMarkup($message, array()));
 
       if (isset($results['powertagging_id'])) {
         // Update the time of the most recent batch.
@@ -333,7 +333,7 @@ class PowerTaggingTagContentForm extends FormBase {
       $message .= t('<ul><li>arguments: %arguments</li></ul>', array(
         '@arguments' => print_r($error_operation[1], TRUE),
       ));
-      drupal_set_message($message, 'error');
+      \Drupal::messenger()->addMessage($message, 'error');
     }
   }
 

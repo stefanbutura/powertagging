@@ -60,7 +60,7 @@ class PowerTaggingCorpusBatches {
         '%date' => \Drupal::service('date.formatter')
           ->format($results['end_time'], 'short')
       ]);
-      drupal_set_message($message);
+      \Drupal::messenger()->addMessage($message);
     }
     else {
       $error_operation = reset($operations);
@@ -72,7 +72,7 @@ class PowerTaggingCorpusBatches {
       $message .= t('<ul><li>arguments: %arguments</li></ul>', array(
         '@arguments' => print_r($error_operation[1], TRUE),
       ));
-      drupal_set_message($message, 'error');
+      \Drupal::messenger()->addMessage($message, 'error');
     }
   }
 }

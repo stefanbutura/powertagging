@@ -5,4 +5,4 @@ core: 8.x
 package: Semantic Drupal
 dependencies:
   - semantic_connector:semantic_connector
-  - drupal:taxonomy
+  - drupal:taxonomy (>=8.8)

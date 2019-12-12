@@ -388,13 +388,13 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
     $status = $powertagging->save();
     switch ($status) {
       case SAVED_NEW:
-        drupal_set_message($this->t('PowerTagging configuration %title has been created.', [
+        \Drupal::messenger()->addMessage($this->t('PowerTagging configuration %title has been created.', [
           '%title' => $powertagging->getTitle(),
         ]));
         break;
 
       default:
-        drupal_set_message($this->t('PowerTagging configuration %title has been updated.', [
+        \Drupal::messenger()->addMessage($this->t('PowerTagging configuration %title has been updated.', [
           '%title' => $powertagging->getTitle(),
         ]));
     }

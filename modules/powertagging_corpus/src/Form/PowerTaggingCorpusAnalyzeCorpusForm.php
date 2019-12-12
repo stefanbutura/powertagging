@@ -108,14 +108,14 @@ class PowerTaggingCorpusAnalyzeCorpusForm extends ConfirmFormBase {
             }
           }
 
-          drupal_set_message(t('The selected corpus could not be found in the PoolParty project.'), 'error');
+          \Drupal::messenger()->addMessage(t('The selected corpus could not be found in the PoolParty project.'), 'error');
           break;
         }
       }
-      drupal_set_message(t('The selected project could not be found on the PoolParty server.'), 'error');
+      \Drupal::messenger()->addMessage(t('The selected project could not be found on the PoolParty server.'), 'error');
     }
     else {
-      drupal_set_message(t('The parameters provided are incorrect.'), 'error');
+      \Drupal::messenger()->addMessage(t('The parameters provided are incorrect.'), 'error');
     }
 
     $form_state->setRedirectUrl(Url::fromRoute('powertagging_corpus.overview'));
@@ -141,14 +141,14 @@ class PowerTaggingCorpusAnalyzeCorpusForm extends ConfirmFormBase {
     if (!$ppt_api->isCorpusAnalysisRunning($values['project_id'])) {
       $result = $ppt_api->analyzeCorpus($values['project_id'], $values['corpus_id']);
       if ($result['success']) {
-        drupal_set_message(t('Successfully started an analysis for corpus "%corpusname".', array('%corpusname' => $values['corpus_label'])));
+        \Drupal::messenger()->addMessage(t('Successfully started an analysis for corpus "%corpusname".', array('%corpusname' => $values['corpus_label'])));
       }
       else {
-        drupal_set_message(t('An error occurred while starting the analysis of corpus "%corpusname".', array('@corpusname' => $values['corpus_label']) . (isset($result['message']) && !empty($result['message'])) ? ' message: ' . $result['message'] : ''), 'error');
+        \Drupal::messenger()->addMessage(t('An error occurred while starting the analysis of corpus "%corpusname".', array('@corpusname' => $values['corpus_label']) . (isset($result['message']) && !empty($result['message'])) ? ' message: ' . $result['message'] : ''), 'error');
       }
     }
     else {
-      drupal_set_message(t('There is already a corpus analysis running for the selected project. Only one corpus analysis for a PoolParty project can run at a time.'), 'error');
+      \Drupal::messenger()->addMessage(t('There is already a corpus analysis running for the selected project. Only one corpus analysis for a PoolParty project can run at a time.'), 'error');
     }
 
     $form_state->setRedirectUrl(Url::fromRoute('powertagging_corpus.overview'));
