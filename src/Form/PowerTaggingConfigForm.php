@@ -501,9 +501,11 @@ class PowerTaggingConfigForm extends EntityForm {
       $concept_schemes = $powertagging_config->getConnection()->getApi('PPT')
         ->getConceptSchemes($powertagging_config->getProjectId());
 
-      foreach ($concept_schemes as $concept_scheme) {
-        if (in_array($concept_scheme['uri'], $settings['concept_scheme_restriction'])) {
-          $concept_scheme_labels[] = $concept_scheme['title'];
+      if (is_array($concept_schemes)) {
+        foreach ($concept_schemes as $concept_scheme) {
+          if (in_array($concept_scheme['uri'], $settings['concept_scheme_restriction'])) {
+            $concept_scheme_labels[] = $concept_scheme['title'];
+          }
         }
       }
     }
