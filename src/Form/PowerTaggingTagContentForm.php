@@ -69,6 +69,35 @@ class PowerTaggingTagContentForm extends FormBase {
         '#default_value' => TRUE,
       ];
 
+      // Date selection.
+      $form['use_date'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Restrict the content on time basis'),
+        '#default_value' => FALSE,
+      );
+
+      $form['created_date_select'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Date restriction'),
+        '#states' => array(
+          'visible' => array(
+            ':input[name="use_date"]' => array('checked' => TRUE),
+          ),
+        ),
+      );
+
+      $form['created_date_select']['date_from'] = array(
+        '#type' => 'date',
+        '#title' => t('Created - From'),
+        '#description' => t('Only tag content created from this day on. (start of day)'),
+      );
+
+      $form['created_date_select']['date_to'] = array(
+        '#type' => 'date',
+        '#title' => t('Created - To'),
+        '#description' => t('Only tag content created to this day. (end of day)'),
+      );
+
       $form['entities_per_request'] = [
         '#type' => 'number',
         '#title' => t('Entities per request'),
@@ -123,6 +152,15 @@ class PowerTaggingTagContentForm extends FormBase {
     if (empty($entities_per_request) || !ctype_digit($entities_per_request) || (int) $entities_per_request == 0 || (int) $entities_per_request > 100) {
       $form_state->setErrorByName('entities_per_request', t('Only values in the range of 1 - 100 are allowed for field "Entities per request"'));
     }
+
+    if ($form_state->getValue('use_date')) {
+      $from = strtotime($form_state->getValue('date_from'));
+      $to = strtotime($form_state->getValue('date_to'));
+
+      if ($from && $to && $from > $to) {
+        $form_state->setErrorByName('created-date-select', t('Please use a valid date range.'));
+      }
+    }
   }
 
   /**
@@ -134,6 +172,19 @@ class PowerTaggingTagContentForm extends FormBase {
     $configuration = $powertagging_config->getConfig();
     $entities_per_request = $form_state->getValue('entities_per_request');
     $content_types = $form_state->getValue('content_types');
+
+    // Set the date filter.
+    $date_filter = [
+      'from' => NULL,
+      'to' => NULL,
+    ];
+    if ($form_state->getValue('use_date')) {
+      $from = strtotime($form_state->getValue('date_from'));
+      $to = strtotime($form_state->getValue('date_to'));
+      $date_filter['from'] = $from ? $from : NULL;
+      // To = selected date + 1 day to simulate until the end of the selected day.
+      $date_filter['to'] = $to ? ($to + 86400) : NULL;
+    }
 
     $start_time = time();
     $total = 0;
@@ -173,16 +224,34 @@ class PowerTaggingTagContentForm extends FormBase {
       $entity_ids = [];
       switch ($entity_type_id) {
         case 'node':
-          $entity_ids = \Drupal::entityQuery($entity_type_id)
-            ->condition('type', $bundle)
-            ->execute();
+          $entity_query = \Drupal::entityQuery($entity_type_id);
+          $entity_query->condition('type', $bundle);
+
+          if ($date_filter['from']) {
+            $entity_query->condition('created', $date_filter['from'], '>=');
+          }
+          if ($date_filter['to']) {
+            $entity_query->condition('created', $date_filter['to'], '<=');
+          }
+
+          $entity_ids = $entity_query->execute();
           break;
 
         case 'user':
-          $entity_ids = \Drupal::entityQuery($entity_type_id)
-            ->execute();
+          $entity_query = \Drupal::entityQuery($entity_type_id);
+
+          if ($date_filter['from']) {
+            $entity_query->condition('created', $date_filter['from'], '>=');
+          }
+          if ($date_filter['to']) {
+            $entity_query->condition('created', $date_filter['to'], '<=');
+          }
+
+          $entity_ids = $entity_query->execute();
           // Remove the user with the ID = 0.
-          array_shift($entity_ids);
+          if (reset($entity_ids) == 0) {
+            array_shift($entity_ids);
+          }
           break;
 
         case 'taxonomy_term':
@@ -207,16 +276,22 @@ class PowerTaggingTagContentForm extends FormBase {
       }
     }
 
-    // Add for each operation some batch info data.
-    $batch_info = [
-      'total' => $total,
-      'start_time' => $start_time,
-    ];
-    foreach ($batch['operations'] as &$operation) {
-      $operation[1][] = $batch_info;
+    if ($total > 0) {
+      // Add for each operation some batch info data.
+      $batch_info = [
+        'total' => $total,
+        'start_time' => $start_time,
+      ];
+      foreach ($batch['operations'] as &$operation) {
+        $operation[1][] = $batch_info;
+      }
+
+      batch_set($batch);
+    }
+    else {
+      \Drupal::messenger()->addMessage(t('There are no entities matching your filters.'), 'error');
     }
 
-    batch_set($batch);
     return TRUE;
   }
 
