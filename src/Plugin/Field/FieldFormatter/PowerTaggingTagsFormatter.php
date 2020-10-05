@@ -162,11 +162,14 @@ class PowerTaggingTagsFormatter extends FormatterBase {
         );
       }
       $powertagging_config = PowerTaggingConfig::load($this->getFieldSetting('powertagging_id'));
-      $elements[] = array(
-        '#markup' => SemanticConnector::themeConcepts($tags_to_theme, $powertagging_config->getConnectionId(), $powertagging_config->getProjectId())
-      );
+      $themed_concepts = SemanticConnector::themeConcepts($tags_to_theme, $powertagging_config->getConnectionId(), $powertagging_config->getProjectId());
+      if (strlen($themed_concepts) > 0) {
+        $elements[] = array(
+          '#markup' => $themed_concepts
+        );
+      }
     }
-
+    
     return $elements;
   }
 }
