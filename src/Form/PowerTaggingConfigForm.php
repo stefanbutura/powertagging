@@ -6,6 +6,7 @@
  */
 
 namespace Drupal\powertagging\Form;
+use Drupal\Component\Utility\Html;
 use Drupal\Core\Entity\Element\EntityAutocomplete;
 use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\Form\FormStateInterface;
@@ -314,7 +315,7 @@ class PowerTaggingConfigForm extends EntityForm {
 
   // The validation handler for the vocabulary selection field.
   public function validateTaxonomy(array &$element, FormStateInterface $form_state, array &$complete_form) {
-    $taxonomy_name = trim(\Drupal\Component\Utility\Html::escape($element['#value']));
+    $taxonomy_name = trim(Html::escape($element['#value']));
     // Do the custom element validation.
     EntityAutocomplete::validateEntityAutocomplete($element, $form_state, $complete_form);
 
@@ -457,7 +458,7 @@ class PowerTaggingConfigForm extends EntityForm {
           '%title' => $powertagging_config->getTitle(),
         ]));
     }
-    $form_state->setRedirectUrl(URL::fromRoute('entity.powertagging.collection'));
+    $form_state->setRedirectUrl(Url::fromRoute('entity.powertagging.collection'));
   }
 
   /**

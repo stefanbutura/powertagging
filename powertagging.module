@@ -1,5 +1,14 @@
 <?php
 
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\powertagging\Entity\PowerTaggingConfig;
+use Drupal\powertagging\PowerTagging;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\node\Entity\NodeType;
+use Drupal\Core\Link;
+use Drupal\Core\Url;
+use Drupal\semantic_connector\SemanticConnector;
+use Drupal\Component\Render\FormattableMarkup;
 /**
  * @file
  * Contains powertagging.module.
@@ -49,7 +58,7 @@ function powertagging_theme() {
  *
  * Alter the field configuration of the powertagging_tags field.
  */
-function powertagging_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
+function powertagging_form_alter(&$form, FormStateInterface $form_state, $form_id) {
   $field_storage = $form_state->getStorage();
   if (isset($field_storage['field_config'])) {
     /* @var \Drupal\field\Entity\FieldConfig $field_config */
@@ -106,9 +115,9 @@ function powertagging_entity_presave($entity) {
 
         if ($tag_entity) {
           // Build the tag settings.
-          $powertagging_config = \Drupal\powertagging\Entity\PowerTaggingConfig::load($field_definition->getFieldStorageDefinition()
+          $powertagging_config = PowerTaggingConfig::load($field_definition->getFieldStorageDefinition()
             ->getSetting('powertagging_id'));
-          $powertagging = new \Drupal\powertagging\PowerTagging($powertagging_config);
+          $powertagging = new PowerTagging($powertagging_config);
           $tag_settings = $powertagging->buildTagSettings([
             'entity_type_id' => $entity->getEntityTypeId(),
             'bundle' => $bundle,
@@ -134,7 +143,7 @@ function powertagging_entity_presave($entity) {
  */
 function powertagging_node_insert($node) {
   // Add the node to the entity extraction cache.
-  \Drupal\powertagging\PowerTagging::buildEntityExtractionCache('node', $node);
+  PowerTagging::buildEntityExtractionCache('node', $node);
 }
 
 /**
@@ -145,8 +154,8 @@ function powertagging_node_insert($node) {
  */
 function powertagging_node_update($node) {
   // Update the node in the entity extraction cache.
-  \Drupal\powertagging\PowerTagging::deleteEntityExtractionCache('node', $node);
-  \Drupal\powertagging\PowerTagging::buildEntityExtractionCache('node', $node);
+  PowerTagging::deleteEntityExtractionCache('node', $node);
+  PowerTagging::buildEntityExtractionCache('node', $node);
 }
 
 /**
@@ -157,13 +166,13 @@ function powertagging_node_update($node) {
  */
 function powertagging_node_delete($node) {
   // Remove the node from the entity extraction cache.
-  \Drupal\powertagging\PowerTagging::deleteEntityExtractionCache('node', $node);
+  PowerTagging::deleteEntityExtractionCache('node', $node);
 }
 
 /**
  * Implements hook_ENTITY_TYPE_delete().
  */
-function powertagging_field_config_delete(Drupal\field\Entity\FieldConfig $field_config) {
+function powertagging_field_config_delete(FieldConfig $field_config) {
   $entity_type = $field_config->getTargetEntityTypeId();
   $bundle = $field_config->getTargetBundle();
   $field_name = $field_config->getName();
@@ -187,7 +196,7 @@ function powertagging_field_config_delete(Drupal\field\Entity\FieldConfig $field
 /**
  * Implements hook_ENTITY_TYPE_delete().
  */
-function powertagging_node_type_delete(Drupal\node\Entity\NodeType $node_type) {
+function powertagging_node_type_delete(NodeType $node_type) {
   // Remove the node type from the PowerTagging entity extraction cache.
   \Drupal::database()->delete('powertagging_entity_extraction_cache')
     ->condition('entity_type', 'node')
@@ -213,7 +222,7 @@ function powertagging_node_type_delete(Drupal\node\Entity\NodeType $node_type) {
 /**
  * Implements hook_form_FORM_ID_alter().
  */
-function powertagging_form_node_type_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
+function powertagging_form_node_type_form_alter(&$form, FormStateInterface $form_state, $form_id) {
   $content_type = $form['type']['#default_value'];
 
   if ($content_type) {
@@ -247,7 +256,7 @@ function powertagging_form_node_type_form_alter(&$form, \Drupal\Core\Form\FormSt
       '#markup' => '<p><b>' . t('Nodes of this type with extracted entities') . ': ' . $extracted_count . ' / ' . $total_count . '</b></p>',
     );
 
-    $extraction_settings = \Drupal\powertagging\PowerTagging::getEntityExtractionSettings('node', $content_type);
+    $extraction_settings = PowerTagging::getEntityExtractionSettings('node', $content_type);
     $form['powertagging_entity_extraction']['powertagging_extraction_enabled'] = array(
       '#type' => 'checkbox',
       '#title' => t('Enable Schema.org Entity Extraction'),
@@ -267,14 +276,14 @@ function powertagging_form_node_type_form_alter(&$form, \Drupal\Core\Form\FormSt
 
     $form['powertagging_entity_extraction']['operations']['powertagging_extraction_batch_extract'] = array(
       '#type' => 'markup',
-      '#markup' => '<ul class="action-links"><li>' . \Drupal\Core\Link::fromTextAndUrl(t('Extract entities for all nodes of this type'), \Drupal\Core\Url::fromRoute('powertagging.extract_entity_tags', [
+      '#markup' => '<ul class="action-links"><li>' . Link::fromTextAndUrl(t('Extract entities for all nodes of this type'), Url::fromRoute('powertagging.extract_entity_tags', [
           'entity_type' => 'node',
           'bundle' => $content_type
         ], ['query' => ['destination' => isset($_GET['destination']) ? $_GET['destination'] : '<front>']]))
           ->toString() . '</li></ul>',
     );
 
-    $connections = \Drupal\semantic_connector\SemanticConnector::getConnectionsByType('pp_server');
+    $connections = SemanticConnector::getConnectionsByType('pp_server');
     $connection_options = array();
     if (!empty($connections)) {
       /** @var \Drupal\semantic_connector\Entity\SemanticConnectorPPServerConnection $connection */
@@ -287,7 +296,7 @@ function powertagging_form_node_type_form_alter(&$form, \Drupal\Core\Form\FormSt
       '#type' => 'select',
       '#title' => t('Select the PoolParty connection to use'),
       '#description' => t('If you haven\'t created a PoolParty server connection yet, you can do so in the Semantic Connector module %link first.', [
-        '%link' => new \Drupal\Component\Render\FormattableMarkup(\Drupal\Core\Link::fromTextAndUrl('here', \Drupal\Core\Url::fromRoute('entity.pp_server_connection.add_form', [], ['query' => ['destination' => isset($_GET['destination']) ? $_GET['destination'] : '']]))
+        '%link' => new FormattableMarkup(Link::fromTextAndUrl('here', Url::fromRoute('entity.pp_server_connection.add_form', [], ['query' => ['destination' => isset($_GET['destination']) ? $_GET['destination'] : '']]))
           ->toString(), array())
       ]),
       '#options' => $connection_options,
@@ -403,9 +412,9 @@ function powertagging_form_node_type_form_alter(&$form, \Drupal\Core\Form\FormSt
  * Join all PoolParty GraphSearch settings into one variable instead of
  * the standard multiple variables.
  */
-function powertagging_form_node_type_form_validate($form, \Drupal\Core\Form\FormStateInterface &$form_state) {
+function powertagging_form_node_type_form_validate($form, FormStateInterface &$form_state) {
   $content_type = $form['type']['#default_value'];
-  $old_extraction_config = \Drupal\powertagging\PowerTagging::getEntityExtractionSettings('node', $content_type);
+  $old_extraction_config = PowerTagging::getEntityExtractionSettings('node', $content_type);
 
   $values = $form_state->getValues();
   if ($values['powertagging_extraction_enabled']) {
@@ -504,7 +513,7 @@ function powertagging_entity_view_alter(array &$build, $entity, $display) {
   $entity_id = $entity->id();
   $language = $entity->language()->getId();
 
-  $extraction_config = \Drupal\powertagging\PowerTagging::getEntityExtractionSettings($entity->getEntityTypeId(), $entity->bundle());
+  $extraction_config = PowerTagging::getEntityExtractionSettings($entity->getEntityTypeId(), $entity->bundle());
   if ($extraction_config['enabled']) {
     // Get all cache values for the current entity.
     $cached_values_query = \Drupal::database()->select('powertagging_entity_extraction_cache', 'c');
