@@ -384,9 +384,9 @@ class PowerTaggingTagContentForm extends FormBase {
         // Update the time of the most recent batch.
         $powertagging_config = PowerTaggingConfig::load($results['powertagging_id']);
         $settings = $powertagging_config->getConfig();
-        $settings['last_batch_tagging'] = time();
         $powertagging_config->setConfig($settings);
         $powertagging_config->save();
+        \Drupal::state()->set('powertagging.' . $powertagging_config->getOriginalId() . '.last_batch_tagging', time());
 
         // If there are any global notifications and they could be caused by a
         // missing retagging action, refresh the notifications.

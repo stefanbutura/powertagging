@@ -306,7 +306,7 @@ function powertagging_update_8107() {
           $limits = $field_definition->getSetting('limits');
 
           foreach ($limits as &$field_limit) {
-            if (is_array(field_limit)) {
+            if (is_array($field_limit)) {
               $field_limit = $field_limit['slider'] ?? '0';
               continue;
             }
@@ -321,5 +321,21 @@ function powertagging_update_8107() {
         }
       }
     }
+  }
+}
+
+/**
+ * Remove last_batch_tagging setting.
+ */
+function powertagging_update_8108() {
+  $configs = \Drupal\powertagging\Entity\PowerTaggingConfig::loadMultiple();
+  /** @var \Drupal\powertagging\Entity\PowerTaggingConfig $config */
+  foreach ($configs as $config) {
+    $settings = $config->getConfig();
+    if (isset($settings['last_batch_tagging'])) {
+      unset($settings['last_batch_tagging']);
+    }
+    $config->setConfig($settings);
+    $config->save();
   }
 }
