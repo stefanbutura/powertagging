@@ -33,6 +33,7 @@ class PowerTaggingTagsFormatter extends FormatterBase {
       'add_hidden_info' => [],
       'tag_sort_order' => 'score',
       'freeterms_at_end' => FALSE,
+      'split_terms' => 0,
     );
   }
 
@@ -68,6 +69,13 @@ class PowerTaggingTagsFormatter extends FormatterBase {
       '#description' => t('Shift freeterms (concepts without a URI) to the end of the tags list.')
     );
 
+    $form['split_terms'] = array(
+      '#title' => t('Split the terms into a list'),
+      '#type' => 'checkbox',
+      '#default_value' => isset($settings['split_terms']) ? $settings['split_terms'] : 0,
+      '#description' => t('Split the terms from a string to a list with terms')
+    );
+
     return $form;
   }
 
@@ -95,6 +103,8 @@ class PowerTaggingTagsFormatter extends FormatterBase {
     $summary_parts[] = t('Tag sort order: @sortorder', array('@sortorder' => $sort_order));
 
     $summary_parts[] = t('Freeterms at the end: @end', array('@end' => (isset($settings['freeterms_at_end']) && $settings['freeterms_at_end']) ? t('True') : t('False')));
+
+    $summary_parts[] = t('Split the terms: @split', array('@split' => (isset($settings['split_terms']) && $settings['split_terms']) ? t('True') : t('False')));
 
     return $summary_parts;
   }
@@ -162,14 +172,27 @@ class PowerTaggingTagsFormatter extends FormatterBase {
         );
       }
       $powertagging_config = PowerTaggingConfig::load($this->getFieldSetting('powertagging_id'));
-      $themed_concepts = SemanticConnector::themeConcepts($tags_to_theme, $powertagging_config->getConnectionId(), $powertagging_config->getProjectId());
-      if (strlen($themed_concepts) > 0) {
-        $elements[] = array(
-          '#markup' => $themed_concepts
-        );
+      if (empty($settings['split_terms'])) {
+        $themed_concepts = SemanticConnector::themeConcepts($tags_to_theme, $powertagging_config->getConnectionId(), $powertagging_config->getProjectId());
+        if (strlen($themed_concepts) > 0) {
+          $elements[] = [
+            '#markup' => $themed_concepts
+          ];
+        }
+      }
+      else {
+        $list = [];
+        foreach ($tags_to_theme as $item) {
+          $list[] = $item['html'];
+        }
+
+        $elements[] = [
+          '#theme' => 'item_list',
+          '#items' => $list,
+        ];
       }
     }
-    
+
     return $elements;
   }
 }
@@ -189,7 +212,7 @@ class PowerTaggingTagsSorter {
    * @param bool $freeterms_at_end
    *   If TRUE concepts will always be listed before freeterms.
    */
-  public function __construct(Array $scores, $sort_by, $freeterms_at_end = FALSE) {
+  public function __construct(Array $scores, $sort_by, $split, $freeterms_at_end = FALSE) {
     $this->scores = $scores;
     $this->order = $sort_by;
     $this->freeterms_at_end = $freeterms_at_end;
