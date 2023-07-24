@@ -522,4 +522,11 @@ class PowerTaggingTagsItem extends FieldItemBase {
     return $supported_fields;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public static function mainPropertyName() {
+    return 'target_id';
+  }
+
 }
