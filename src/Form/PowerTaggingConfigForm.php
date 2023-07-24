@@ -442,10 +442,10 @@ class PowerTaggingConfigForm extends EntityForm {
             'field_type' => $field_type,
           ];
           $limits = [
-            'concepts_per_extraction' => $config['limits']['concepts_per_extraction']['slider'],
-            'concepts_threshold' => $config['limits']['concepts_threshold']['slider'],
-            'freeterms_per_extraction' => $config['limits']['freeterms_per_extraction']['slider'],
-            'freeterms_threshold' => $config['limits']['freeterms_threshold']['slider'],
+            'concepts_per_extraction' => $config['limits']['concepts_per_extraction'],
+            'concepts_threshold' => $config['limits']['concepts_threshold'],
+            'freeterms_per_extraction' => $config['limits']['freeterms_per_extraction'],
+            'freeterms_threshold' => $config['limits']['freeterms_threshold'],
           ];
           $powertagging_config->updateField($field, 'limits', $limits);
         }
@@ -552,25 +552,21 @@ class PowerTaggingConfigForm extends EntityForm {
 
     $form['concepts']['concepts_per_extraction'] = [
       '#title' => t('Max concepts / categories per extraction'),
-      '#type' => 'slider',
+      '#type' => 'number',
       '#default_value' => $config['concepts_per_extraction'],
       '#min' => 0,
       '#max' => 100,
       '#step' => 1,
-      '#slider_style' => 'concept',
-      '#slider_length' => '500px',
       '#description' => t('Maximum number of concepts (or categories when the PowerTagging mode is set to "Classification") to be displayed as a tagging result.'),
     ];
 
     $form['concepts']['concepts_threshold'] = [
       '#title' => t('Threshold level for the concepts'),
-      '#type' => 'slider',
+      '#type' => 'number',
       '#default_value' => $config['concepts_threshold'],
-      '#min' => 1,
+      '#min' => 0,
       '#max' => 100,
       '#step' => 1,
-      '#slider_style' => 'concept',
-      '#slider_length' => '500px',
       '#description' => t('Only concepts with a minimum score of the chosen value will be displayed as a tagging result.'),
     ];
 
@@ -585,25 +581,21 @@ class PowerTaggingConfigForm extends EntityForm {
 
     $form['freeterms']['freeterms_per_extraction'] = [
       '#title' => t('Max free terms per extraction'),
-      '#type' => 'slider',
+      '#type' => 'number',
       '#default_value' => $config['freeterms_per_extraction'],
       '#min' => 0,
       '#max' => 100,
       '#step' => 1,
-      '#slider_style' => 'freeterm',
-      '#slider_length' => '500px',
       '#description' => t('Maximum number of free terms for tagging.'),
     ];
 
     $form['freeterms']['freeterms_threshold'] = [
       '#title' => t('Threshold level for the free terms'),
-      '#type' => 'slider',
+      '#type' => 'number',
       '#default_value' => $config['freeterms_threshold'],
-      '#min' => 1,
+      '#min' => 0,
       '#max' => 100,
       '#step' => 1,
-      '#slider_length' => '500px',
-      '#slider_style' => 'freeterm',
       '#description' => t('Only free terms with a minimum score of the chosen value will be used for tagging.') . '<br />' . t('WARNING: A threshold below 40 may reduce the quality of free term extractions!'),
     ];
   }

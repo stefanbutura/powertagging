@@ -269,3 +269,57 @@ function powertagging_update_8106() {
     }
   }
 }
+
+/**
+ * Fix powertagging global limits and field limits.
+ */
+function powertagging_update_8107() {
+  $configs = \Drupal\powertagging\Entity\PowerTaggingConfig::loadMultiple();
+  /** @var \Drupal\powertagging\Entity\PowerTaggingConfig $config */
+  foreach ($configs as $config) {
+    $settings = $config->getConfig();
+    foreach ($settings['limits'] as &$limit) {
+      if (is_array($limit)) {
+        $limit = $limit['slider'] ?? '0';
+        continue;
+      }
+
+      if (empty($limit)) {
+        $limit = '0';
+      }
+    }
+    $config->setConfig($settings);
+    $config->save();
+  }
+
+  /** @var \Drupal\Core\Entity\EntityFieldManager $entityFieldManager */
+  $entityFieldManager = \Drupal::service('entity_field.manager');
+  $fields = $entityFieldManager->getFieldMapByFieldType('powertagging_tags');
+  foreach ($fields as $entity_type_id => $fields_per_entity_type) {
+    foreach ($fields_per_entity_type as $field_type => $field) {
+      foreach ($field['bundles'] as $bundle) {
+        $field_definitions = $entityFieldManager->getFieldDefinitions($entity_type_id, $bundle);
+        if (isset($field_definitions[$field_type])) {
+          /** @var \Drupal\field\Entity\FieldConfig $field_definition */
+          $field_definition = $field_definitions[$field_type];
+
+          $limits = $field_definition->getSetting('limits');
+
+          foreach ($limits as &$field_limit) {
+            if (is_array(field_limit)) {
+              $field_limit = $field_limit['slider'] ?? '0';
+              continue;
+            }
+
+            if (empty($field_limit)) {
+              $field_limit = '0';
+            }
+          }
+
+          $field_definition->setSetting('limits', $limits);
+          $field_definition->save();
+        }
+      }
+    }
+  }
+}

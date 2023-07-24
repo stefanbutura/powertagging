@@ -60,7 +60,10 @@ class PowerTaggingTagsItem extends FieldItemBase {
     ];
 
     if (!$is_sub_entity) {
-      $allowed_widgets['core']['entity_reference'] = ['entity_reference_autocomplete', 'entity_reference_autocomplete_tags'];
+      $allowed_widgets['core']['entity_reference'] = [
+        'entity_reference_autocomplete',
+        'entity_reference_autocomplete_tags',
+      ];
       $allowed_widgets = array_merge($allowed_widgets, [
         'file' => [
           'file' => ['file_generic'],
@@ -164,7 +167,8 @@ class PowerTaggingTagsItem extends FieldItemBase {
       $url = URL::fromRoute('entity.powertagging.collection');
       $description = t('No PowerTagging configuration found.') . '<br />';
       $description .= t('Please create it first in the <a href="@url">PowerTagging configuration</a> area.', ['@url' => $url->toString()]);
-      \Drupal::messenger()->addMessage(t('No PowerTagging configuration found for the selection below.'), 'error');
+      \Drupal::messenger()
+        ->addMessage(t('No PowerTagging configuration found for the selection below.'), 'error');
     }
 
     $element['powertagging_id'] = [
@@ -196,10 +200,10 @@ class PowerTaggingTagsItem extends FieldItemBase {
         'fields' => [],
         'default_tags_field' => '',
         'limits' => [],
-        'file_upload' => array(
+        'file_upload' => [
           'max_file_size' => ($max_file_size > (2 * 1048576)) ? (2 * 1048576) : $max_file_size,
-          'max_file_count' => 5
-        ),
+          'max_file_count' => 5,
+        ],
         'ac_add_matching_label' => FALSE,
         'ac_add_context' => FALSE,
       ] + parent::defaultFieldSettings();
@@ -237,29 +241,29 @@ class PowerTaggingTagsItem extends FieldItemBase {
       ];
     }
 
-    $form['special'] = array(
+    $form['special'] = [
       '#type' => 'fieldset',
       '#title' => t('Special settings'),
       '#collapsible' => FALSE,
       '#tree' => FALSE,
-    );
+    ];
 
     $form['special']['include_in_tag_glossary'] = [
       '#type' => 'checkbox',
       '#title' => t('Include in PowerTagging Tag Glossary'),
       '#description' => t('Show tags of this field in the "PowerTagging Tag Glossary" block (if it is enabled)'),
       '#default_value' => $field->getSetting('include_in_tag_glossary'),
-      '#parents' => array('settings', 'include_in_tag_glossary'),
+      '#parents' => ['settings', 'include_in_tag_glossary'],
     ];
 
-    $form['special']['automatically_tag_new_entities'] = array(
+    $form['special']['automatically_tag_new_entities'] = [
       '#type' => 'checkbox',
       '#title' => t('Automatically tag new entities'),
       '#description' => t('When entities get created and don\'t have values for this field yet, they will be tagged automatically.'),
       '#default_value' => $field->getSetting('automatically_tag_new_entities'),
       '#empty_value' => '',
-      '#parents' => array('settings', 'automatically_tag_new_entities'),
-    );
+      '#parents' => ['settings', 'automatically_tag_new_entities'],
+    ];
 
     // Show the fields that can be used for tagging.
     $options = $this->getSupportedTaggingFields($field->getTargetEntityTypeId(), $field->getTargetBundle());
@@ -273,8 +277,8 @@ class PowerTaggingTagsItem extends FieldItemBase {
     ];
 
     // Add file upload settings if the content type has the appropriate fields.
-    $allowed_modules = array('file', 'media');
-    $state_fields_list = array();
+    $allowed_modules = ['file', 'media'];
+    $state_fields_list = [];
     foreach ($options as $field_name => $title) {
       $field_storage = FieldStorageConfig::loadByName($field->getTargetEntityTypeId(), $field_name);
       if (!is_null($field_storage)) {
@@ -287,43 +291,43 @@ class PowerTaggingTagsItem extends FieldItemBase {
     if (!empty($state_fields_list)) {
       $file_upload_settings = $field->getSetting('file_upload');
       $state_fields = implode(', ', $state_fields_list);
-      $form['file_upload'] = array(
+      $form['file_upload'] = [
         '#type' => 'details',
         '#title' => t('File extraction settings'),
         '#open' => FALSE,
-        '#states' => array(
-          'visible' => array($state_fields => array('checked' => TRUE)),
-        ),
-      );
+        '#states' => [
+          'visible' => [$state_fields => ['checked' => TRUE]],
+        ],
+      ];
 
       // Add max file size to the form.
       $max_file_size = floor(Environment::getUploadMaxSize() / 1048576);
       $max_file_size = ($max_file_size > 10) ? 10 : $max_file_size;
-      $file_size_options = array();
+      $file_size_options = [];
       for ($i = 1; $i <= $max_file_size; $i++) {
         $file_size_options[$i * 1048576] = $i . ' MB';
       }
       $default_max_file_size = (isset($file_upload_settings['max_file_size']) && $max_file_size > ($file_upload_settings['max_file_size'] / 1048576)) ? ($file_upload_settings['max_file_size'] / 1048576) : $max_file_size;
-      $form['file_upload']['max_file_size'] = array(
+      $form['file_upload']['max_file_size'] = [
         '#type' => 'select',
         '#title' => t('Maximum file size for each attached file'),
         '#description' => t('Only files below the specified value are used for the extraction.'),
         '#options' => $file_size_options,
         '#default_value' => ($default_max_file_size * 1048576),
-      );
+      ];
 
       // Add max file count to the form.
-      $file_count_options = array();
+      $file_count_options = [];
       for ($i = 1; $i <= 10; $i++) {
         $file_count_options[$i] = $i;
       }
-      $form['file_upload']['max_file_count'] = array(
+      $form['file_upload']['max_file_count'] = [
         '#type' => 'select',
         '#title' => t('Maximum number of files per node'),
         '#description' => t('Only the specified number of files are used for the extraction per node.'),
         '#options' => $file_count_options,
-        '#default_value' => (isset($file_upload_settings['max_file_count']) ? $file_upload_settings['max_file_count']: 5),
-      );
+        '#default_value' => (isset($file_upload_settings['max_file_count']) ? $file_upload_settings['max_file_count'] : 5),
+      ];
     }
 
     // Limit settings.
@@ -342,7 +346,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
     $powertagging_mode = $powertagging_config_settings['project']['mode'];
     $powertagging_corpus = $powertagging_config_settings['project']['corpus_id'];
     PowerTaggingConfigForm::addLimitsForm($form['limits'], $limits, TRUE);
-    foreach (array('concepts', 'freeterms') as $concept_type) {
+    foreach (['concepts', 'freeterms'] as $concept_type) {
       $form['limits'][$concept_type]['#description'] .= '<br />' . t('Note: These settings override the global settings defined in the connected PowerTagging configuration.');
     }
 
@@ -355,26 +359,26 @@ class PowerTaggingTagsItem extends FieldItemBase {
 
     if ($powertagging_mode == 'annotation') {
       if (!empty($powertagging_corpus)) {
-        $form['limits']['concepts']['use_shadow_concepts'] = array(
+        $form['limits']['concepts']['use_shadow_concepts'] = [
           '#type' => 'checkbox',
           '#title' => t('Also find concepts that are not directly contained within the content'),
           '#description' => t('It searches for concepts that do not appear in the content but have something to do with it.'),
           '#default_value' => (!is_null($field->getSetting('use_shadow_concepts')) ? $field->getSetting('use_shadow_concepts') : FALSE),
-          '#parents' => array('settings', 'use_shadow_concepts'),
-        );
+          '#parents' => ['settings', 'use_shadow_concepts'],
+        ];
       }
 
-      $form['limits']['concepts']['browse_concepts_charttypes'] = array(
+      $form['limits']['concepts']['browse_concepts_charttypes'] = [
         '#type' => 'checkboxes',
         '#title' => t('Visually browse concepts'),
-        '#options' => array(
+        '#options' => [
           'spider' => 'Visual Mapper (circle visualisation)',
           'tree' => 'Tree View',
-        ),
+        ],
         '#default_value' => (!is_null($field->getSetting('browse_concepts_charttypes')) ? $field->getSetting('browse_concepts_charttypes') : []),
         '#description' => t('If at least one of the visualisation types is selected, users can click on a button to use a visualisation to select additional concepts to use in the thesaurus.') . '<br />' . t('Selecting multiple chart types will allow the user to switch between the chart types.'),
-        '#parents' => array('settings', 'browse_concepts_charttypes'),
-      );
+        '#parents' => ['settings', 'browse_concepts_charttypes'],
+      ];
 
       if (!SemanticConnector::visualMapperUsable()) {
         $form['limits']['concepts']['browse_concepts_charttypes']['#disabled'] = TRUE;
@@ -382,34 +386,34 @@ class PowerTaggingTagsItem extends FieldItemBase {
       }
     }
 
-    $form['limits']['freeterms']['custom_freeterms'] = array(
+    $form['limits']['freeterms']['custom_freeterms'] = [
       '#type' => 'checkbox',
       '#title' => 'Allow users to add custom free terms',
       '#description' => 'If this options is enabled users can add custom free terms by writing text in the search-box of the PowerTagging widget and clicking the enter key.',
       '#default_value' => $field->getSetting('custom_freeterms'),
-      '#parents' => array('settings', 'custom_freeterms'),
-    );
+      '#parents' => ['settings', 'custom_freeterms'],
+    ];
 
     // Search settings.
-    $form['search'] = array(
+    $form['search'] = [
       '#type' => 'details',
       '#title' => t('Search settings'),
       '#open' => FALSE,
-    );
+    ];
 
-    $form['search']['ac_add_matching_label'] = array(
+    $form['search']['ac_add_matching_label'] = [
       '#type' => 'checkbox',
       '#title' => t('Add the matching label to every suggestion in the drop down menu.'),
       '#default_value' => $field->getSetting('ac_add_matching_label'),
-      '#parents' => array('settings', 'ac_add_matching_label'),
-    );
+      '#parents' => ['settings', 'ac_add_matching_label'],
+    ];
 
-    $form['search']['ac_add_context'] = array(
+    $form['search']['ac_add_context'] = [
       '#type' => 'checkbox',
       '#title' => t('Add the context (title of the concept scheme) to every suggestion in the drop down menu.'),
       '#default_value' => $field->getSetting('ac_add_context'),
-      '#parents' => array('settings', 'ac_add_context'),
-    );
+      '#parents' => ['settings', 'ac_add_context'],
+    ];
 
     return $form;
   }
@@ -421,10 +425,10 @@ class PowerTaggingTagsItem extends FieldItemBase {
     $limits = [];
     if (!empty($settings['limits'])) {
       $limits = [
-        'concepts_per_extraction' => $settings['limits']['concepts']['concepts_per_extraction'],
-        'concepts_threshold' => $settings['limits']['concepts']['concepts_threshold'],
-        'freeterms_per_extraction' => $settings['limits']['freeterms']['freeterms_per_extraction'],
-        'freeterms_threshold' => $settings['limits']['freeterms']['freeterms_threshold'],
+        'concepts_per_extraction' => $settings['limits']['concepts_per_extraction'],
+        'concepts_threshold' => $settings['limits']['concepts_threshold'],
+        'freeterms_per_extraction' => $settings['limits']['freeterms_per_extraction'],
+        'freeterms_threshold' => $settings['limits']['freeterms_threshold'],
       ];
     }
     return [
@@ -464,8 +468,7 @@ class PowerTaggingTagsItem extends FieldItemBase {
 
     switch ($entity_type) {
       case 'node':
-        $supported_fields['title'] = $field_definitions['title']->getLabel()
-           . '<span class="description">[Text field]</span>';
+        $supported_fields['title'] = $field_definitions['title']->getLabel() . '<span class="description">[Text field]</span>';
         break;
 
       case 'taxonomy_term':
