@@ -494,7 +494,11 @@ class PowerTaggingTagsItem extends FieldItemBase {
 
       $field_storage = $field_definition->getFieldStorageDefinition();
       $specific_widget_type = $form_display->getComponent($field_definition->getName());
-      if (isset($supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()]) && in_array($specific_widget_type['type'], $supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()])) {
+      if (
+        isset($specific_widget_type['type']) &&
+        isset($supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()]) && 
+        in_array($specific_widget_type['type'], $supported_field_types[$field_storage->getTypeProvider()][$field_storage->getType()])
+      ) {
         $widget_info = $widget_manager->getDefinition($specific_widget_type['type']);
         // A normal field.
         if ($field_storage->getType() !== 'entity_reference') {
