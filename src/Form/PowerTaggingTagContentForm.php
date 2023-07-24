@@ -40,10 +40,10 @@ class PowerTaggingTagContentForm extends FormBase {
       $extraction_model_notifications = PowerTagging::checkExtractionModels($powertagging_config, FALSE);
       if (!empty($extraction_model_notifications)) {
         // Fixed values for the formatter.
-        $form['extraction_model_refresh_required'] = array(
+        $form['extraction_model_refresh_required'] = [
           '#type' => 'markup',
           '#markup' => '<div class="messages warning">' . $extraction_model_notifications[0] . '</div>',
-        );
+        ];
       }
 
       // Fixed values for the formatter.
@@ -69,34 +69,40 @@ class PowerTaggingTagContentForm extends FormBase {
         '#default_value' => TRUE,
       ];
 
+      $form['keep_existing_tags'] = [
+        '#type' => 'checkbox',
+        '#title' => t('Keep existing tags'),
+        '#default_value' => TRUE,
+      ];
+
       // Date selection.
-      $form['use_date'] = array(
+      $form['use_date'] = [
         '#type' => 'checkbox',
         '#title' => t('Restrict the content on time basis'),
         '#default_value' => FALSE,
-      );
+      ];
 
-      $form['created_date_select'] = array(
+      $form['created_date_select'] = [
         '#type' => 'fieldset',
         '#title' => t('Date restriction'),
-        '#states' => array(
-          'visible' => array(
-            ':input[name="use_date"]' => array('checked' => TRUE),
-          ),
-        ),
-      );
+        '#states' => [
+          'visible' => [
+            ':input[name="use_date"]' => ['checked' => TRUE],
+          ],
+        ],
+      ];
 
-      $form['created_date_select']['date_from'] = array(
+      $form['created_date_select']['date_from'] = [
         '#type' => 'date',
         '#title' => t('Created - From'),
         '#description' => t('Only tag content created from this day on. (start of day)'),
-      );
+      ];
 
-      $form['created_date_select']['date_to'] = array(
+      $form['created_date_select']['date_to'] = [
         '#type' => 'date',
         '#title' => t('Created - To'),
         '#description' => t('Only tag content created to this day. (end of day)'),
-      );
+      ];
 
       $form['entities_per_request'] = [
         '#type' => 'number',
@@ -113,21 +119,24 @@ class PowerTaggingTagContentForm extends FormBase {
         '#value' => t('Start process'),
         '#attributes' => ['class' => ['button--primary']],
       ];
-      $form['cancel'] = array(
+      $form['cancel'] = [
         '#type' => 'link',
         '#title' => t('Cancel'),
         '#url' => Url::fromRoute('entity.powertagging.edit_config_form', ['powertagging' => $powertagging_config->id()]),
         '#suffix' => '</div>',
-      );
+      ];
     }
     else {
-      \Drupal::messenger()->addMessage(t('No taggable content types found for PowerTagging configuration "%ptconfname".', array('%ptconfname' => $powertagging_config->getTitle())), 'error');
-      return new RedirectResponse(Url::fromRoute('entity.powertagging.edit_config_form', ['powertagging' => $powertagging_config->id()])->toString());
+      \Drupal::messenger()
+        ->addMessage(t('No taggable content types found for PowerTagging configuration "%ptconfname".', ['%ptconfname' => $powertagging_config->getTitle()]), 'error');
+      return new RedirectResponse(Url::fromRoute('entity.powertagging.edit_config_form', ['powertagging' => $powertagging_config->id()])
+        ->toString());
     }
 
     if (\Drupal::request()->query->has('destination')) {
       $destination = \Drupal::request()->get('destination');
-      $url = Url::fromUri(\Drupal::request()->getSchemeAndHttpHost() . $destination);
+      $url = Url::fromUri(\Drupal::request()
+          ->getSchemeAndHttpHost() . $destination);
     }
     else {
       $url = Url::fromRoute('entity.powertagging.edit_config_form', ['powertagging' => $powertagging_config->id()]);
@@ -204,7 +213,8 @@ class PowerTaggingTagContentForm extends FormBase {
 
       // If the entity type is not supported, throw an error and continue.
       if (!in_array($entity_type_id, ['node', 'user', 'taxonomy_term'])) {
-        \Drupal::messenger()->addMessage(t('Entity type "%entitytype" is not supported in bulk tagging.', ['%entitytype' => $entity_type_id]), 'error');
+        \Drupal::messenger()
+          ->addMessage(t('Entity type "%entitytype" is not supported in bulk tagging.', ['%entitytype' => $entity_type_id]), 'error');
         continue;
       }
 
@@ -214,7 +224,10 @@ class PowerTaggingTagContentForm extends FormBase {
         'field_type' => $field_type,
       ];
       $powertagging = new PowerTagging($powertagging_config);
-      $tag_settings = $powertagging->buildTagSettings($field_info, array('skip_tagged_content' => $form_state->getValue('skip_tagged_content')));
+      $tag_settings = $powertagging->buildTagSettings($field_info, [
+        'skip_tagged_content' => $form_state->getValue('skip_tagged_content'),
+        'keep_existing_tags' => $form_state->getValue('keep_existing_tags'),
+      ]);
 
       // Remove PowerTagging Config object from the settings for more memory
       // resources during the batch process.
@@ -255,8 +268,7 @@ class PowerTaggingTagContentForm extends FormBase {
           break;
 
         case 'taxonomy_term':
-          $entity_ids = \Drupal::entityQuery($entity_type_id)
-            ->execute();
+          $entity_ids = \Drupal::entityQuery($entity_type_id)->execute();
           break;
       }
       $count = count($entity_ids);
@@ -289,7 +301,8 @@ class PowerTaggingTagContentForm extends FormBase {
       batch_set($batch);
     }
     else {
-      \Drupal::messenger()->addMessage(t('There are no entities matching your filters.'), 'error');
+      \Drupal::messenger()
+        ->addMessage(t('There are no entities matching your filters.'), 'error');
     }
 
     return TRUE;
@@ -317,7 +330,7 @@ class PowerTaggingTagContentForm extends FormBase {
       $context['results']['tagged'] = 0;
       $context['results']['skipped'] = 0;
       $context['results']['error_count'] = 0;
-      $context['results']['error'] = array();
+      $context['results']['error'] = [];
       $context['results']['powertagging_id'] = $tag_settings['powertagging_id'];
     }
 
@@ -333,7 +346,7 @@ class PowerTaggingTagContentForm extends FormBase {
         ->loadMultiple($entity_ids);
     }
     catch (\Exception $e) {
-      watchdog_exception('PowerTagging Batch Process', $e, 'Unable to load entities with ids: %ids. ' . $e->getMessage(), array('%ids' => print_r($entity_ids, TRUE)));
+      watchdog_exception('PowerTagging Batch Process', $e, 'Unable to load entities with ids: %ids. ' . $e->getMessage(), ['%ids' => print_r($entity_ids, TRUE)]);
       $context['results']['processed'] += count($entity_ids);
       $context['results']['error_count'] += count($entity_ids);
       $context['results']['error']['loading'] = array_merge($context['results']['error']['loading'], $entity_ids);
@@ -371,14 +384,15 @@ class PowerTaggingTagContentForm extends FormBase {
     if ($success) {
       $message = t('Successfully finished content tagging of %total_entities entities on %date:', [
           '%total_entities' => $results['processed'],
-          '%date' => \Drupal::service('date.formatter')->format($results['end_time'], 'short')
+          '%date' => \Drupal::service('date.formatter')
+            ->format($results['end_time'], 'short'),
         ]) . '<br />';
       $message .= t('<ul><li>tagged: %tagged_entities</li><li>skipped: %skipped_entities</li><li>errors: %error_entities</li></ul>', [
         '%tagged_entities' => $results['tagged'],
         '%skipped_entities' => $results['skipped'],
         '%error_entities' => self::createErrorList($results['error']),
       ]);
-      \Drupal::messenger()->addMessage(new FormattableMarkup($message, array()));
+      \Drupal::messenger()->addMessage(new FormattableMarkup($message, []));
 
       if (isset($results['powertagging_id'])) {
         // Update the time of the most recent batch.
@@ -386,11 +400,13 @@ class PowerTaggingTagContentForm extends FormBase {
         $settings = $powertagging_config->getConfig();
         $powertagging_config->setConfig($settings);
         $powertagging_config->save();
-        \Drupal::state()->set('powertagging.' . $powertagging_config->getOriginalId() . '.last_batch_tagging', time());
+        \Drupal::state()
+          ->set('powertagging.' . $powertagging_config->getOriginalId() . '.last_batch_tagging', time());
 
         // If there are any global notifications and they could be caused by a
         // missing retagging action, refresh the notifications.
-        $notifications = \Drupal::config('semantic_connector.settings')->get('global_notifications');
+        $notifications = \Drupal::config('semantic_connector.settings')
+          ->get('global_notifications');
         if (!empty($notifications)) {
           $notification_config = SemanticConnector::getGlobalNotificationConfig();
           if (isset($notification_config['actions']['powertagging_retag_content']) && $notification_config['actions']['powertagging_retag_content']) {
@@ -401,13 +417,14 @@ class PowerTaggingTagContentForm extends FormBase {
     }
     else {
       $error_operation = reset($operations);
-      $message = t('An error occurred while processing %error_operation on %date', array(
+      $message = t('An error occurred while processing %error_operation on %date', [
           '%error_operation' => $error_operation[0],
-          '%date' => \Drupal::service('date.formatter')->format($results['end_time'], 'short'),
-        )) . '<br />';
-      $message .= t('<ul><li>arguments: %arguments</li></ul>', array(
+          '%date' => \Drupal::service('date.formatter')
+            ->format($results['end_time'], 'short'),
+        ]) . '<br />';
+      $message .= t('<ul><li>arguments: %arguments</li></ul>', [
         '@arguments' => print_r($error_operation[1], TRUE),
-      ));
+      ]);
       \Drupal::messenger()->addMessage($message, 'error');
     }
   }
@@ -425,9 +442,9 @@ class PowerTaggingTagContentForm extends FormBase {
     if (empty($errors)) {
       return '0';
     }
-    $item_types = array();
+    $item_types = [];
     foreach ($errors as $error_type => $entities) {
-      $items = array();
+      $items = [];
       foreach ($entities as $entity_type => $ids) {
         $current_entities = [];
         try {
@@ -435,11 +452,13 @@ class PowerTaggingTagContentForm extends FormBase {
             ->getStorage($entity_type)
             ->loadMultiple($ids);
         }
-        catch (\Exception $exception) {}
+        catch (\Exception $exception) {
+        }
 
         /** @var \Drupal\Core\Entity\ContentEntityBase $entity */
         foreach ($current_entities as $entity) {
-          $items[] = '<li>' . Link::fromTextAndUrl($entity->label(), $entity->toUrl())->toString() . '</li>';
+          $items[] = '<li>' . Link::fromTextAndUrl($entity->label(), $entity->toUrl())
+              ->toString() . '</li>';
         }
       }
       $item_types[] = '<li>' . t($error_type) . ': <ul>' . implode('', $items) . '</ul></li>';
