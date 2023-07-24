@@ -23,7 +23,7 @@
 
         if (typeof settings !== "undefined") {
           $(this).autocomplete({
-            source: drupalSettings.path.baseUrl + "powertagging/autocomplete-tags/" + settings.settings.powertagging_id + '/' + settings.settings.entity_language,
+            source: drupalSettings.path.baseUrl + drupalSettings.path.pathPrefix + "powertagging/autocomplete-tags/" + settings.settings.powertagging_id + '/' + settings.settings.entity_language,
             minLength: 2,
             select: function (event, ui) {
               event.preventDefault();
@@ -102,7 +102,7 @@
           var pt_field_id = $(this).data('drupal-selector').replace(/^edit-(.*)-powertagging-get-tags$/, "$1").replace(/-/g, "_");
           var data = collectContent(pt_field_id);
           PTContainers.extractionArea(pt_field_id).loading();
-          $.post(drupalSettings.path.baseUrl + "powertagging/extract/" + data.settings.powertagging_id, data, function (tags) {
+          $.post(drupalSettings.path.baseUrl + drupalSettings.path.pathPrefix + "powertagging/extract/" + data.settings.powertagging_id, data, function (tags) {
             renderResult(pt_field_id, tags);
           }, "json");
         });
@@ -146,7 +146,7 @@
               }
             };
             powertagging_vm[field_id] = browse_tags_area.children(".powertagging-browse-tags-vm").empty().initVisualMapper(settings, {"conceptLoaded": [addConceptButton]});
-            powertagging_vm[field_id].load(drupalSettings.path.baseUrl + "powertagging/get-visualmapper-data/" + pt_field.settings.powertagging_id, "", "en");
+            powertagging_vm[field_id].load(drupalSettings.path.baseUrl + drupalSettings.path.pathPrefix + "powertagging/get-visualmapper-data/" + pt_field.settings.powertagging_id, "", "en");
 
             // The dialog gets opened the first time.
             if (powertagging_field.find('.powertagging-browse-tags-area').length > 0) {
@@ -190,7 +190,7 @@
                 });
 
                 var data = {settings: pt_field.settings, concepts: concepts};
-                $.post(drupalSettings.path.baseUrl + "powertagging/get-concept-tids", data, function (result_tags) {
+                $.post(drupalSettings.path.baseUrl + drupalSettings.path.pathPrefix + "powertagging/get-concept-tids", data, function (result_tags) {
                   // Add the tags to the result.
                   result_tags.forEach(function (result_tag) {
                     result_tag.label = result_tag.prefLabel;
@@ -206,7 +206,7 @@
             var autocomplete_box = browse_tags_area.find('.powertagging-browse-tags-search-ac');
             autocomplete_box.autocomplete({
               minLength: 2,
-              source: drupalSettings.path.baseUrl + "powertagging/autocomplete-tags/" + pt_field.settings.powertagging_id + '/' + pt_field.settings.entity_language,
+              source: drupalSettings.path.baseUrl + drupalSettings.path.pathPrefix + "powertagging/autocomplete-tags/" + pt_field.settings.powertagging_id + '/' + pt_field.settings.entity_language,
               focus: function (event, ui) {
                 this.value = ui.item.label;
                 return false;
@@ -313,7 +313,7 @@
               // Then load the data.
               $.ajax({
                 dataType: "json",
-                url: drupalSettings.path.baseUrl + "powertagging/get-visualmapper-data/" + pt_field.settings.powertagging_id,
+                url: drupalSettings.path.baseUrl + drupalSettings.path.pathPrefix + "powertagging/get-visualmapper-data/" + pt_field.settings.powertagging_id,
                 data: {
                   uri: data.id,
                   lang: vm.language
@@ -354,7 +354,7 @@
 
             // Update the autocomplete path.
             $(html_field_id).find("input.powertagging_autocomplete_tags").autocomplete(
-                'option', 'source', drupalSettings.path.baseUrl + "powertagging/autocomplete-tags/" + settings.settings.powertagging_id + '/' + settings.settings.entity_language
+                'option', 'source', drupalSettings.path.baseUrl + drupalSettings.path.pathPrefix + "powertagging/autocomplete-tags/" + settings.settings.powertagging_id + '/' + settings.settings.entity_language
             );
           });
         });
