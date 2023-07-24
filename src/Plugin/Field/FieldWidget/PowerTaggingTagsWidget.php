@@ -96,8 +96,10 @@ class PowerTaggingTagsWidget extends WidgetBase {
           }*/
 
           // The term has to be created in the correct taxonomy.
-          if ($term->hasField('field_uri') && $term->get('field_uri')->count()) {
-            $default_terms[] = $term->getName() . '|' . $term->get('field_uri')->getString();
+          if ($term->hasField('field_uri') && $term->get('field_uri')
+              ->count()) {
+            $default_terms[] = $term->getName() . '|' . $term->get('field_uri')
+                ->getString();
           }
           else {
             $default_terms[] = $term->getName() . '|';
@@ -153,16 +155,16 @@ class PowerTaggingTagsWidget extends WidgetBase {
     }
 
     if ($add_visual_mapper) {
-      $element['powertagging']['browse_tags'] = array(
+      $element['powertagging']['browse_tags'] = [
         '#value' => t('Browse tags'),
         '#type' => 'button',
-        '#attributes' => array(
-          'class' => array('powertagging-browse-tags'),
-        ),
-      );
+        '#attributes' => [
+          'class' => ['powertagging-browse-tags'],
+        ],
+      ];
 
       // Using #children prevents stripping of attributes and form elements.
-      $element['powertagging']['browse_tags_area'] = array(
+      $element['powertagging']['browse_tags_area'] = [
         '#children' => '
 <div class="powertagging-browse-tags-area" style="display:none;">
   <div class="powertagging-browse-tags-search">
@@ -176,8 +178,8 @@ class PowerTaggingTagsWidget extends WidgetBase {
      <button class="powertagging-browse-tags-selection-cancel" type="button">Cancel</button>
   </div>
   <div class="powertagging-browse-tags-vm"></div>
-</div>'
-      );
+</div>',
+      ];
     }
 
     $element['powertagging']['tags_result'] = [
@@ -195,9 +197,9 @@ class PowerTaggingTagsWidget extends WidgetBase {
     $element['powertagging']['get_tags'] = [
       '#value' => t('Get tags'),
       '#type' => 'button',
-      '#attributes' => array(
-        'class' => array('powertagging-get-tags'),
-      ),
+      '#attributes' => [
+        'class' => ['powertagging-get-tags'],
+      ],
     ];
 
     // Attach the libraries.
@@ -307,9 +309,8 @@ class PowerTaggingTagsWidget extends WidgetBase {
         $existing_terms_by_uri = [];
         /** @var Term $existing_term */
         foreach ($terms as $existing_term) {
-          if ($existing_term->hasField('field_uri') &&
-            $existing_term->get('field_uri')->count()
-          ) {
+          if ($existing_term->hasField('field_uri') && $existing_term->get('field_uri')
+              ->count()) {
             $uri = $existing_term->get('field_uri')->getString();
             $existing_terms_by_uri[$uri] = $existing_term;
           }
@@ -375,12 +376,18 @@ class PowerTaggingTagsWidget extends WidgetBase {
         list($tag_id, $score) = explode('#', $tag);
         $term = Term::load($tag_id);
         if (!is_null($term)) {
+          $uri = '';
+          $type = 'freeterm';
+          if ($term->hasField('field_uri')) {
+            $uri = $term->get('field_uri')->getValue();
+            $type = empty($term->get('field_uri')
+              ->getString()) ? 'freeterm' : 'concept';
+          }
           $selected_tags[] = [
             'tid' => $term->id(),
-            'uri' => $term->get('field_uri')->getString(),
+            'uri' => $uri,
             'label' => $term->getName(),
-            'type' => empty($term->get('field_uri')
-              ->getString()) ? 'freeterm' : 'concept',
+            'type' => $type,
             'score' => $score,
           ];
         }
