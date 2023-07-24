@@ -25,9 +25,12 @@ use Drupal\taxonomy\Entity\Term;
 class PowerTagging {
 
   protected $config;
+
   protected $config_settings;
+
   /* @param SemanticConnectorPPXApi $PPXApi */
   protected $PPXApi;
+
   protected $result;
 
   /**
@@ -111,23 +114,25 @@ class PowerTagging {
                   $specific_widget_type = $form_display->getComponent($field_definition->getName());
 
                   if (!$field_definition instanceof FieldConfig) {
-                    $tag_fields[$allowed_bundle][$tag_field_name] = array(
+                    $tag_fields[$allowed_bundle][$tag_field_name] = [
                       'module' => 'core',
                       'widget' => $specific_widget_type['type'],
-                    );
+                    ];
                   }
                   else {
                     $field_storage = $field_definition->getFieldStorageDefinition();
-                    $tag_fields[$allowed_bundle][$tag_field_name] = array(
+                    $tag_fields[$allowed_bundle][$tag_field_name] = [
                       'module' => $field_storage->getTypeProvider(),
                       'widget' => $specific_widget_type['type'],
-                    );
+                    ];
                   }
                 }
               }
             }
 
-            $loaded_entities = \Drupal::entityTypeManager()->getStorage($ref_entity_type)->loadMultiple($entity_ids);
+            $loaded_entities = \Drupal::entityTypeManager()
+              ->getStorage($ref_entity_type)
+              ->loadMultiple($entity_ids);
             foreach ($loaded_entities as $loaded_entity) {
               if ($ref_entity_type != 'node' || $loaded_entity->access('view')) {
                 $ref_bundle = $loaded_entity->bundle();
@@ -156,6 +161,7 @@ class PowerTagging {
         $param['shadowConceptCorpusId'] = $corpus_id;
       }
     }
+
     if (!empty($settings['concept_scheme_restriction'])) {
       $param['conceptSchemeFilters'] = $settings['concept_scheme_restriction'];
     }
@@ -217,9 +223,12 @@ class PowerTagging {
           $extracted_files_count = 0;
           foreach ($files as $file_id) {
             $file = File::load($file_id);
+            if (empty($file)) {
+              continue;
+            }
             // Use only existing files for tagging.
             if (!file_exists($file->getFileUri())) {
-              throw new \Exception(t('File %file does not exist.', array('%file' => $file->getFilename())));
+              throw new \Exception(t('File %file does not exist.', ['%file' => $file->getFilename()]));
             }
             elseif ($file->getSize() <= $settings['max_file_size']) {
               // Annotation.
@@ -231,7 +240,7 @@ class PowerTagging {
                 $extraction = $this->PPXApi->extractCategories($file, $project_languages[$settings['entity_language']], $param, 'file');
               }
               if (is_null($extraction)) {
-                throw new \Exception(t('Unable to extract from file %file.', array('%file' => $file->getFilename())));
+                throw new \Exception(t('Unable to extract from file %file.', ['%file' => $file->getFilename()]));
               }
               else {
                 $extracted_tags = $this->extractTags($extraction, $settings);
@@ -352,13 +361,13 @@ class PowerTagging {
       // Ignore all not found taxonomy terms.
       if (!empty($concepts)) {
         foreach ($concepts as $concept) {
-          $tags['concepts'][] = array(
+          $tags['concepts'][] = [
             'tid' => $concept['tid'],
             'uri' => $concept['uri'],
             'label' => $concept['prefLabel'],
             'score' => $concept['score'],
             'type' => 'concept',
-          );
+          ];
         }
       }
     }
@@ -435,19 +444,32 @@ class PowerTagging {
       $context['results']['processed']++;
 
       // Return if this entity does not need to be tagged.
-      if ($tag_settings['skip_tagged_content'] && $entity->hasField($field_type) &&
-        $entity->get($field_type)->count()
-      ) {
+      if ($tag_settings['skip_tagged_content'] && $entity->hasField($field_type) && $entity->get($field_type)
+          ->count()) {
         $context['results']['skipped']++;
         continue;
       }
 
-      $tags = [];
+      $existing_tags = [];
+      if ($tag_settings['keep_existing_tags'] && $entity->hasField($field_type)) {
+        $existing_tags = $entity->get($field_type)->getValue();
+      }
+
       try {
         $tags = $this->extractTagsOfEntity($entity, $tag_settings);
+        $tag_ids = array_column($tags, 'target_id');
+        foreach ($existing_tags as $existing_tag) {
+          if (in_array($existing_tag['target_id'], $tag_ids)) {
+            continue;
+          }
+          $tags[] = $existing_tag;
+        }
       }
       catch (\Exception $e) {
-        watchdog_exception('PowerTagging Batch Process', $e, 'Unable to extract concepts from %type with id: %id. ' . $e->getMessage(), array('%type' => $entity->getEntityTypeId(), '%id' => $entity->id()));
+        watchdog_exception('PowerTagging Batch Process', $e, 'Unable to extract concepts from %type with id: %id. ' . $e->getMessage(), [
+          '%type' => $entity->getEntityTypeId(),
+          '%id' => $entity->id(),
+        ]);
         $context['results']['error_count']++;
         $context['results']['error']['extracting'][$entity->getEntityTypeId()][] = $entity->id();
       }
@@ -458,7 +480,7 @@ class PowerTagging {
         $entity->save();
       }
       catch (\Exception $e) {
-        watchdog_exception('PowerTagging Batch Process', $e, 'Unable to save entity with id: %id. ' . $e->getMessage(), array('%id' => $entity->id()));
+        watchdog_exception('PowerTagging Batch Process', $e, 'Unable to save entity with id: %id. ' . $e->getMessage(), ['%id' => $entity->id()]);
         $context['results']['error_count']++;
         $context['results']['error']['saving'][$entity->getEntityTypeId()][] = $entity->id();
       }
@@ -505,10 +527,8 @@ class PowerTagging {
     }
 
     // Add already existing terms from default tags field if required.
-    if (!empty($tag_settings['default_tags_field']) &&
-      $entity->hasField($tag_settings['default_tags_field']) &&
-      $entity->get($tag_settings['default_tags_field'])->count()
-    ) {
+    if (!empty($tag_settings['default_tags_field']) && $entity->hasField($tag_settings['default_tags_field']) && $entity->get($tag_settings['default_tags_field'])
+        ->count()) {
       $default_tags_info_field = FieldStorageConfig::loadByName($entity->getEntityTypeId(), $tag_settings['default_tags_field']);
       $keys = array_keys($default_tags_info_field->getColumns());
       $field_values = $entity->get($tag_settings['default_tags_field'])
@@ -524,7 +544,9 @@ class PowerTagging {
         $low_term_name = strtolower($term->getName());
         $unique = TRUE;
         foreach ($extraction_result['suggestion']['concepts'] as $concept) {
-          if ($term->hasField('field_uri') && $term->get('field_uri')->count() && $term->get('field_uri')->getString() == $concept['uri']) {
+          if ($term->hasField('field_uri') && $term->get('field_uri')
+              ->count() && $term->get('field_uri')
+              ->getString() == $concept['uri']) {
             $unique = FALSE;
             break;
           }
@@ -541,23 +563,24 @@ class PowerTagging {
             }
           }
           if ($unique) {
-            if ($term->hasField('field_uri') && $term->get('field_uri')->count()) {
-              $extraction_result['suggestion']['concepts'][] = array(
+            if ($term->hasField('field_uri') && $term->get('field_uri')
+                ->count()) {
+              $extraction_result['suggestion']['concepts'][] = [
                 'tid' => 0,
                 'uri' => $term->get('field_uri')->getString(),
                 'label' => $term->getName(),
                 'score' => 100,
                 'type' => 'concept',
-              );
+              ];
             }
             else {
-              $extraction_result['suggestion']['freeterms'][] = array(
+              $extraction_result['suggestion']['freeterms'][] = [
                 'tid' => 0,
                 'uri' => '',
                 'label' => $term->getName(),
                 'score' => 100,
                 'type' => 'freeterm',
-              );
+              ];
             }
           }
         }
@@ -583,14 +606,15 @@ class PowerTagging {
    *   - file_ids (array) --> An array of file IDs that were extracted.
    */
   public static function extractEntityContent($entity, $fields) {
-    $entity_content = array(
+    $entity_content = [
       'text' => '',
-      'file_ids' => array(),
+      'file_ids' => [],
       'entities' => [],
-    );
+    ];
     $text_parts = [];
     foreach ($fields as $tag_field_name => $tag_type) {
-      if (!$entity->hasField($tag_field_name) || $entity->get($tag_field_name)->count() == 0) {
+      if (!$entity->hasField($tag_field_name) || $entity->get($tag_field_name)
+          ->count() == 0) {
         continue;
       }
 
@@ -656,9 +680,8 @@ class PowerTagging {
     $existing_terms_by_uri = [];
     /** @var Term $existing_term */
     foreach ($terms as $existing_term) {
-      if ($existing_term->hasField('field_uri') &&
-        $existing_term->get('field_uri')->count()
-      ) {
+      if ($existing_term->hasField('field_uri') && $existing_term->get('field_uri')
+          ->count()) {
         $existing_terms_by_uri[$existing_term->get('field_uri')
           ->getString()] = $existing_term;
       }
@@ -712,7 +735,10 @@ class PowerTagging {
     foreach ($extraction_result['suggestion']['concepts'] as $concept) {
       if ($concept['tid'] > 0) {
         $tids[] = $concept['tid'];
-        $tags[] = ['target_id' => $concept['tid'], 'score' => $concept['score']];
+        $tags[] = [
+          'target_id' => $concept['tid'],
+          'score' => $concept['score'],
+        ];
       }
       else {
         $term = $concept['label'] . '|' . $concept['uri'];
@@ -724,12 +750,16 @@ class PowerTagging {
     foreach ($extraction_result['suggestion']['freeterms'] as $concept) {
       if ($concept['tid'] > 0) {
         $tids[] = $concept['tid'];
-        $tags[] = ['target_id' => $concept['tid'], 'score' => $concept['score']];
+        $tags[] = [
+          'target_id' => $concept['tid'],
+          'score' => $concept['score'],
+        ];
       }
       else {
         $term = $concept['label'] . '|' . $concept['uri'];
         $new_terms[] = $term;
-        $new_terms_score[$term] = $concept['score'];      }
+        $new_terms_score[$term] = $concept['score'];
+      }
     }
 
     // Update existing taxonomy terms if required.
@@ -738,9 +768,8 @@ class PowerTagging {
       $existing_terms_by_uri = [];
       /** @var Term $existing_term */
       foreach ($terms as $existing_term) {
-        if ($existing_term->hasField('field_uri') &&
-          $existing_term->get('field_uri')->count()
-        ) {
+        if ($existing_term->hasField('field_uri') && $existing_term->get('field_uri')
+            ->count()) {
           $uri = $existing_term->get('field_uri')->getString();
           $existing_terms_by_uri[$uri] = $existing_term;
         }
@@ -768,7 +797,10 @@ class PowerTagging {
       $new_term_ids = $this->addTaxonomyTerms($vid, $new_terms, $langcode);
       // Merge existing and new terms.
       foreach ($new_term_ids as $term => $new_term_id) {
-        $tags[] = ['target_id' => $new_term_id, 'score' => $new_terms_score[$term]];
+        $tags[] = [
+          'target_id' => $new_term_id,
+          'score' => $new_terms_score[$term],
+        ];
       }
     }
 
@@ -840,7 +872,8 @@ class PowerTagging {
 
     // Set hidden labels.
     if (isset($concept_details->hiddenLabels) && !empty($concept_details->hiddenLabels)) {
-      $term->get('field_hidden_labels')->setValue($concept_details->hiddenLabels);
+      $term->get('field_hidden_labels')
+        ->setValue($concept_details->hiddenLabels);
     }
     else {
       $term->get('field_hidden_labels')->setValue(NULL);
@@ -856,7 +889,8 @@ class PowerTagging {
 
     // Set the related concepts.
     if (isset($concept_details->relateds) && !empty($concept_details->relateds)) {
-      $term->get('field_related_concepts')->setValue($concept_details->relateds);
+      $term->get('field_related_concepts')
+        ->setValue($concept_details->relateds);
     }
     else {
       $term->get('field_related_concepts')->setValue(NULL);
@@ -947,24 +981,30 @@ class PowerTagging {
 
       // Put the term into the "Concepts" or "Free terms" list.
       // Delete old hierarchy values.
-      \Drupal::database()->delete('taxonomy_term__parent')
+      \Drupal::database()
+        ->delete('taxonomy_term__parent')
         ->condition('entity_id', $term->id())
         ->execute();
 
       // Insert new hierarchy values.
       $parent_id = !empty($uri) ? $parent['concepts'] : $parent['freeterms'];
-      \Drupal::database()->insert('taxonomy_term__parent')
-        ->fields(['bundle', 'deleted', 'entity_id', 'revision_id', 'langcode', 'delta', 'parent_target_id'])
-        ->values([
+      \Drupal::database()->insert('taxonomy_term__parent')->fields([
+          'bundle',
+          'deleted',
+          'entity_id',
+          'revision_id',
+          'langcode',
+          'delta',
+          'parent_target_id',
+        ])->values([
           'bundle' => $term->bundle(),
           'deleted' => 0,
           'entity_id' => $term->id(),
           'revision_id' => $term->id(),
           'langcode' => $term->language()->getId(),
           'delta' => 0,
-          'parent_target_id' => (int) $parent_id
-        ])
-        ->execute();
+          'parent_target_id' => (int) $parent_id,
+        ])->execute();
 
       $term_ids[$new_term] = $term->id();
     }
@@ -979,17 +1019,17 @@ class PowerTagging {
    *   Optional; A specific PowerTagging configuration to check for PoolParty
    *   updates. If none is given, all PowerTagging configurations get checked.
    * @param bool $add_config_info
-   *   If set to TRUE, information about what PowerTagging configuration uses the
-   *   the extraction model will be added to the notification.
+   *   If set to TRUE, information about what PowerTagging configuration uses
+   *   the the extraction model will be added to the notification.
    *
    * @return string[]
    *   Array of notification strings.
    */
   public static function checkExtractionModels($powertagging_config = NULL, $add_config_info = TRUE) {
-    $notifications = array();
+    $notifications = [];
 
     if (!is_null($powertagging_config)) {
-      $configs = array($powertagging_config);
+      $configs = [$powertagging_config];
     }
     else {
       $configs = PowerTaggingConfig::loadMultiple();
@@ -998,8 +1038,7 @@ class PowerTagging {
     /** @var PowerTaggingConfig $config */
     foreach ($configs as $config) {
       /** @var \Drupal\semantic_connector\Api\SemanticConnectorPPTApi $ppt_api */
-      $ppt_api = $config->getConnection()
-        ->getApi('PPT');
+      $ppt_api = $config->getConnection()->getApi('PPT');
 
       $extraction_model_info = $ppt_api->getExtractionModelInfo($config->getProjectId());
       if (is_array($extraction_model_info) && !$extraction_model_info['upToDate']) {
@@ -1016,7 +1055,8 @@ class PowerTagging {
         }
 
         // Add the notification.
-        $notifications[] = t('The extraction model for the PoolParty project "%project" is outdated', array('%project' => $project_label)) . ($add_config_info ? ' ' . t('(used in PowerTagging configuration "%powertaggingtitle")', array('%powertaggingtitle' => $config->getTitle())) : '') . '. ' . Link::fromTextAndUrl('refresh it now', Url::fromRoute('entity.powertagging.refresh_extraction_model', array('powertagging_config' => $config->id())))->toString();
+        $notifications[] = t('The extraction model for the PoolParty project "%project" is outdated', ['%project' => $project_label]) . ($add_config_info ? ' ' . t('(used in PowerTagging configuration "%powertaggingtitle")', ['%powertaggingtitle' => $config->getTitle()]) : '') . '. ' . Link::fromTextAndUrl('refresh it now', Url::fromRoute('entity.powertagging.refresh_extraction_model', ['powertagging_config' => $config->id()]))
+            ->toString();
       }
     }
 
@@ -1034,10 +1074,10 @@ class PowerTagging {
    *   Array of notification strings.
    */
   public static function checkRetaggingRequired($powertagging_config = NULL) {
-    $notifications = array();
+    $notifications = [];
 
     if (!is_null($powertagging_config)) {
-      $configs = array($powertagging_config);
+      $configs = [$powertagging_config];
     }
     else {
       $configs = PowerTaggingConfig::loadMultiple();
@@ -1046,14 +1086,14 @@ class PowerTagging {
     /** @var PowerTaggingConfig $config */
     foreach ($configs as $config) {
       /** @var \Drupal\semantic_connector\Api\SemanticConnectorPPTApi $ppt_api */
-      $ppt_api = $config->getConnection()
-        ->getApi('PPT');
+      $ppt_api = $config->getConnection()->getApi('PPT');
 
-      $settings = $config->getConfig();
+      $last_update = \Drupal::state()
+        ->get('powertagging.' . $config->getOriginalId() . '.last_batch_tagging');
 
       $extraction_model_info = $ppt_api->getExtractionModelInfo($config->getProjectId());
       // The extraction model was refreshed recently.
-      if (is_array($extraction_model_info) && strtotime($extraction_model_info['lastBuildTime']) > $settings['last_batch_tagging']) {
+      if (is_array($extraction_model_info) && strtotime($extraction_model_info['lastBuildTime']) > $last_update) {
         // Check if the PowerTagging configuration is already connected with content / fields.
         $fields = $config->getFields();
         if (!empty($fields)) {
@@ -1070,7 +1110,11 @@ class PowerTagging {
           }
 
           // Add the notification.
-          $notifications[] = t('The extraction model for the PoolParty project "%project" was updated, your content can now be retagged with PowerTagging configuration "%powertaggingtitle".', array('%project' => $project_label, '%powertaggingtitle' => $config->getTitle())) . ' ' . Link::fromTextAndUrl('retag content', Url::fromRoute('entity.powertagging.tag_content', array('powertagging_config' => $config->id())))->toString();
+          $notifications[] = t('The extraction model for the PoolParty project "%project" was updated, your content can now be retagged with PowerTagging configuration "%powertaggingtitle".', [
+              '%project' => $project_label,
+              '%powertaggingtitle' => $config->getTitle(),
+            ]) . ' ' . Link::fromTextAndUrl('retag content', Url::fromRoute('entity.powertagging.tag_content', ['powertagging_config' => $config->id()]))
+              ->toString();
         }
       }
     }
@@ -1231,7 +1275,8 @@ class PowerTagging {
 
           default:
             // If the entity type is not supported, throw an error and continue.
-            \Drupal::messenger()->addMessage(t('Entity type "%entitytype" is not supported.', ['%entitytype' => $field_instance->getTargetEntityTypeId()]), 'warning');
+            \Drupal::messenger()
+              ->addMessage(t('Entity type "%entitytype" is not supported.', ['%entitytype' => $field_instance->getTargetEntityTypeId()]), 'warning');
             continue 2;
         }
         if ($add_fieldname) {
@@ -1264,15 +1309,18 @@ class PowerTagging {
    *   - powertagging_id (int) --> The ID of the PowerTagging configuration.
    *   - powertagging_config (object) --> The PowerTagging configuration.
    *   - taxonomy_id (int) --> The vocabulary ID used for the tagging.
-   *   - concepts_per_extraction (int) --> The number of concepts per extraction.
+   *   - concepts_per_extraction (int) --> The number of concepts per
+   *   extraction.
    *   - concepts_threshold (int) --> The threshold of concepts.
-   *   - freeterms_per_extraction (int) --> The number of treeterms per extraction.
+   *   - freeterms_per_extraction (int) --> The number of treeterms per
+   *   extraction.
    *   - freeterms_threshold (int) --> The threshold of freeterms.
    *   - fields (array) --> An associative array of tag fields by field ID,
    *     containing keys "module" and "type".
-   *   - skip_tagged_content (bool) --> Whether to skip already tagged content or
-   *     tag it anyway.
-   *   - default_tags_field (array) --> The field names of fields that should be
+   *   - skip_tagged_content (bool) --> Whether to skip already tagged content
+   *   or tag it anyway.
+   *   - default_tags_field (array) --> The field names of fields that should
+   *   be
    *     used as the default value for the tags.
    *   - ... anything added by the $settings parameter.
    */
@@ -1311,7 +1359,7 @@ class PowerTagging {
     }
 
     // Build the tag settings array.
-    $tag_settings = array(
+    $tag_settings = [
       'field_name' => $field_info['field_type'],
       'entity_type' => $field_info['entity_type_id'],
       'bundle' => $field_info['bundle'],
@@ -1336,7 +1384,7 @@ class PowerTagging {
       'max_file_count' => (isset($field_settings['file_upload']['max_file_count']) ? $field_settings['file_upload']['max_file_count'] : 5),
       'ac_add_matching_label' => (isset($field_settings['ac_add_matching_label']) ? $field_settings['ac_add_matching_label'] : FALSE),
       'ac_add_context' => (isset($field_settings['ac_add_context']) ? $field_settings['ac_add_context'] : FALSE),
-    );
+    ];
 
     // Merge in the additional settings.
     $tag_settings = array_merge($tag_settings, $settings);
@@ -1518,7 +1566,8 @@ class PowerTagging {
    *   requested entities.
    */
   public static function getEntityExtractionSettings($entity_type, $bundle) {
-    $extraction_config = \Drupal::config('powertagging.settings')->get('entity_extraction_settings');
+    $extraction_config = \Drupal::config('powertagging.settings')
+      ->get('entity_extraction_settings');
     $default_config = [
       'enabled' => FALSE,
       'connection_id' => '',
@@ -1558,8 +1607,10 @@ class PowerTagging {
 
           $fields = $entity_extraction_settings['fields'];
           foreach ($fields as $field_id) {
-            if ($entity->hasField($field_id) && $entity->get($field_id)->count() > 0) {
-              foreach ($entity->get($field_id)->getValue() as $delta => $field_value) {
+            if ($entity->hasField($field_id) && $entity->get($field_id)
+                ->count() > 0) {
+              foreach ($entity->get($field_id)
+                         ->getValue() as $delta => $field_value) {
                 $extracted_entities = $ppx_api->extractNamedEntities(utf8_encode($field_value['value']), $entity_extraction_settings['languages'][$entity_language], $entity_extraction_settings['types']);
                 if (!empty($extracted_entities)) {
                   $to_replace = [];
@@ -1583,7 +1634,7 @@ class PowerTagging {
                     'location' => [
                       'type' => 'Place',
                       'property' => 'name',
-                    ]
+                    ],
                   ];
 
                   // Replace strings from the back.
@@ -1600,8 +1651,9 @@ class PowerTagging {
                   }
 
                   // Save the HTML to the entity extraction cache.
-                  \Drupal::database()->insert('powertagging_entity_extraction_cache')
-                    ->fields(array(
+                  \Drupal::database()
+                    ->insert('powertagging_entity_extraction_cache')
+                    ->fields([
                       'entity_type' => $entity_type,
                       'bundle' => $entity->bundle(),
                       'entity_id' => $entity->id(),
@@ -1609,7 +1661,7 @@ class PowerTagging {
                       'field_name' => $field_id,
                       'delta' => $delta,
                       'html' => $result_html,
-                    ))
+                    ])
                     ->execute();
                 }
               }
@@ -1631,7 +1683,8 @@ class PowerTagging {
   public static function deleteEntityExtractionCache($entity_type, $entity) {
     switch ($entity_type) {
       case 'node':
-        \Drupal::database()->delete('powertagging_entity_extraction_cache')
+        \Drupal::database()
+          ->delete('powertagging_entity_extraction_cache')
           ->condition('entity_type', $entity_type)
           ->condition('entity_id', $entity->id())
           ->condition('language', $entity->language()->getId())
@@ -1651,6 +1704,6 @@ class PowerTagging {
    */
   public static function createMachineName($name) {
     $name = strtolower($name);
-    return substr(preg_replace(array('@[^a-z0-9_]+@', '@_+@'), '_', $name), 0, 32);
+    return substr(preg_replace(['@[^a-z0-9_]+@', '@_+@'], '_', $name), 0, 32);
   }
 }

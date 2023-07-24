@@ -239,3 +239,33 @@ function powertagging_update_8105() {
     }
   }
 }
+
+/**
+ * Change concept_scheme_restriction value from array to string.
+ */
+function powertagging_update_8106() {
+  $configs = \Drupal\powertagging\Entity\PowerTaggingConfig::loadMultiple();
+  /** @var \Drupal\powertagging\Entity\PowerTaggingConfig $config */
+  foreach ($configs as $config) {
+    $settings = $config->getConfig();
+    if (empty($settings['concept_scheme_restriction'])) {
+      $settings['concept_scheme_restriction'] = '';
+      $config->setConfig($settings);
+      $config->save();
+      continue;
+    }
+
+    if (is_array($settings['concept_scheme_restriction'])) {
+      if (count($settings)) {
+        $settings['concept_scheme_restriction'] = '';
+        $config->setConfig($settings);
+        $config->save();
+        continue;
+      }
+
+      $settings['concept_scheme_restriction'] = reset($settings['concept_scheme_restriction']);
+      $config->setConfig($settings);
+      $config->save();
+    }
+  }
+}

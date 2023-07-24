@@ -5,6 +5,7 @@
  */
 
 namespace Drupal\powertagging\Form;
+
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\Form\FormStateInterface;
@@ -48,7 +49,8 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
     }
     $settings = $powertagging->getConfig();
 
-    $connection_overides = \Drupal::config('semantic_connector.settings')->get('override_connections');
+    $connection_overides = \Drupal::config('semantic_connector.settings')
+      ->get('override_connections');
     $overridden_values = [];
     if ($powertagging->isNew() && isset($connection_overides[$powertagging->id()])) {
       $overridden_values = $connection_overides[$powertagging->id()];
@@ -72,7 +74,12 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
       /** @var \Drupal\semantic_connector\Entity\SemanticConnectorPPServerConnection $connection */
       foreach ($connections as $connection) {
         $credentials = $connection->getCredentials();
-        $key = implode('|', array($connection->getTitle(), $connection->getUrl(), $credentials['username'], $credentials['password']));
+        $key = implode('|', [
+          $connection->getTitle(),
+          $connection->getUrl(),
+          $credentials['username'],
+          $credentials['password'],
+        ]);
         $connection_options[$key] = $connection->getTitle();
       }
       $form['server_settings']['load_connection'] = [
@@ -161,9 +168,9 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
       $not_available = '<div id="health_info" class="not-available">' . t('The server is not available or the credentials are incorrect.') . '</div>';
       $markup = $connection->available() ? $available : $not_available;
     }
-    $form['server_settings']['health_info'] = array(
+    $form['server_settings']['health_info'] = [
       '#markup' => $markup,
-    );
+    ];
 
     // Container: 2. Project loading.
     $form['project_load'] = [
@@ -193,14 +200,14 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
 
     // Get the project options for the currently configured PoolParty server.
     $connection = NULL;
-    if($form_state->hasValue('url') && UrlHelper::isValid($form_state->getValue('url'), TRUE)) {
+    if ($form_state->hasValue('url') && UrlHelper::isValid($form_state->getValue('url'), TRUE)) {
       // Create a new connection (without saving) with the current form data.
       $connection = SemanticConnector::getConnection('pp_server');
       $connection->setUrl($form_state->getValue('url'));
-      $connection->setCredentials(array(
+      $connection->setCredentials([
         'username' => $form_state->getValue('username'),
         'password' => $form_state->getValue('password'),
-      ));
+      ]);
     }
     elseif (!$powertagging->isNew()) {
       $connection = $powertagging->getConnection();
@@ -212,7 +219,7 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
       $projects = $connection->getApi('PPX')->getProjects();
     }
 
-    $project_options = array();
+    $project_options = [];
     foreach ($projects as $project) {
       $project_options[$project['uuid']] = $project['label'];
     }
@@ -237,25 +244,25 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
       '#default_value' => (!$powertagging->isNew() ? $powertagging->getProjectId() : NULL),
       '#required' => TRUE,
       '#validated' => TRUE,
-      '#ajax' => array(
+      '#ajax' => [
         'callback' => '::getConceptSchemes',
         'wrapper' => 'concept-schemes-replace',
         'method' => 'replace',
         'effect' => 'fade',
-      ),
+      ],
     ];
     if (isset($overridden_values['project_id'])) {
       $form['project_select']['project']['#description'] = '<span class="semantic-connector-overridden-value">' . t('Warning: overridden by variable') . '</span>';
     }
 
     // Container: Project selection.
-    $form['further_restrictions'] = array(
+    $form['further_restrictions'] = [
       '#type' => 'details',
       '#title' => t('4. Further restrictions'),
       '#description' => t('Note: A project has to be selected before any further restriction can be added.') . '<br />' . t('The restriction on the concept scheme level requires at least PoolParty version 6.2 to work properly.'),
       '#open' => (!$powertagging->isNew() && isset($settings['concept_scheme_restriction']) && !empty($settings['concept_scheme_restriction'])),
       '#suffix' => '</div>',
-    );
+    ];
 
     // Get the concept scheme options for the currently configured PoolParty server.
     $concept_schemes = [];
@@ -273,22 +280,24 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
       }
     }
 
-    $concept_scheme_options = array();
+    $concept_scheme_options = [
+      '' => 'None',
+    ];
     foreach ($concept_schemes as $concept_scheme) {
       $concept_scheme_options[$concept_scheme['uri']] = $concept_scheme['title'];
     }
 
     // configuration set admin page.
-    $form['further_restrictions']['concept_scheme_restriction'] = array(
-      '#type' => 'checkboxes',
+    $form['further_restrictions']['concept_scheme_restriction'] = [
+      '#type' => 'radios',
       '#title' => t('Filter by concept scheme'),
       '#description' => t('All concept schemes will be used if no checkbox is selected'),
       '#prefix' => '<div id="concept-schemes-replace">',
       '#suffix' => '</div>',
       '#options' => $concept_scheme_options,
-      '#default_value' => (!$powertagging->isNew() && isset($settings['concept_scheme_restriction']) ? $settings['concept_scheme_restriction'] : []),
+      '#default_value' => (!$powertagging->isNew() && isset($settings['concept_scheme_restriction']) ? $settings['concept_scheme_restriction'] : ''),
       '#validated' => TRUE,
-    );
+    ];
 
     $form['#attached'] = [
       'library' => [
@@ -331,23 +340,19 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
           }
           if ($project_is_valid) {
             // Check if the selected concept schemes are available for this project.
-            $concept_scheme_values = array_filter($form_state->getValue('concept_scheme_restriction'));
+            $concept_scheme_value = $form_state->getValue('concept_scheme_restriction');
             if (!empty($concept_scheme_values)) {
               $concept_schemes = $connection->getApi('PPT')
                 ->getConceptSchemes($form_state->getValue('project'));
-              foreach ($concept_scheme_values as $concept_scheme_value) {
-                $concept_scheme_exists = FALSE;
-                foreach ($concept_schemes as $concept_scheme) {
-                  if ($concept_scheme['uri'] == $concept_scheme_value) {
-                    $concept_scheme_exists = TRUE;
-                    break;
-                  }
-                }
-
-                if (!$concept_scheme_exists) {
-                  $form_state->setErrorByName('concept_scheme_restriction', t('At least one invalid concept scheme has been selected.'));
+              foreach ($concept_schemes as $concept_scheme) {
+                if ($concept_scheme['uri'] == $concept_scheme_value) {
+                  $concept_scheme_exists = TRUE;
                   break;
                 }
+              }
+
+              if (!$concept_scheme_exists) {
+                $form_state->setErrorByName('concept_scheme_restriction', t('At least one invalid concept scheme has been selected.'));
               }
             }
           }
@@ -372,7 +377,7 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
       'username' => $form_state->getValue('username'),
       'password' => $form_state->getValue('password'),
     ]);
-    $concept_scheme_values = array_values(array_filter($form_state->getValue('concept_scheme_restriction')));
+    $concept_scheme_value = $form_state->getValue('concept_scheme_restriction');
 
     if ($powertagging->isNew()) {
       $powertagging->set('id', SemanticConnector::createUniqueEntityMachineName('powertagging', $powertagging->getTitle()));
@@ -382,23 +387,25 @@ class PowerTaggingConfigConnectionForm extends EntityForm {
 
     // Add config changes.
     $settings = $powertagging->getConfig();
-    $settings['concept_scheme_restriction'] = $concept_scheme_values;
+    $settings['concept_scheme_restriction'] = $concept_scheme_value;
     $powertagging->setConfig($settings);
 
     $status = $powertagging->save();
     switch ($status) {
       case SAVED_NEW:
-        \Drupal::messenger()->addMessage($this->t('PowerTagging configuration %title has been created.', [
-          '%title' => $powertagging->getTitle(),
-        ]));
+        \Drupal::messenger()
+          ->addMessage($this->t('PowerTagging configuration %title has been created.', [
+            '%title' => $powertagging->getTitle(),
+          ]));
         break;
 
       default:
-        \Drupal::messenger()->addMessage($this->t('PowerTagging configuration %title has been updated.', [
-          '%title' => $powertagging->getTitle(),
-        ]));
+        \Drupal::messenger()
+          ->addMessage($this->t('PowerTagging configuration %title has been updated.', [
+            '%title' => $powertagging->getTitle(),
+          ]));
     }
-    $form_state->setRedirectUrl(Url::fromRoute('entity.powertagging.edit_config_form', array('powertagging' => $powertagging->id())));
+    $form_state->setRedirectUrl(Url::fromRoute('entity.powertagging.edit_config_form', ['powertagging' => $powertagging->id()]));
   }
 
   /**

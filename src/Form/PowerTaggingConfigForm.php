@@ -6,6 +6,7 @@
  */
 
 namespace Drupal\powertagging\Form;
+
 use Drupal\Component\Utility\Html;
 use Drupal\Core\Entity\Element\EntityAutocomplete;
 use Drupal\Core\Entity\EntityForm;
@@ -46,7 +47,7 @@ class PowerTaggingConfigForm extends EntityForm {
     $projects = $ppx_api->getProjects();
 
     // Set action links for bulk operations.
-    $project_languages = array();
+    $project_languages = [];
     foreach ($config['project']['languages'] as $pp_language) {
       if (!empty($pp_language)) {
         $project_languages[] = $pp_language;
@@ -54,16 +55,16 @@ class PowerTaggingConfigForm extends EntityForm {
     }
     if (!empty($project_languages)) {
       // Make the dynamically added actions look like normal ones.
-      $link_options = array(
-        'attributes' => array(
-          'class' => array(
+      $link_options = [
+        'attributes' => [
+          'class' => [
             'button',
             'button-action',
             'button--primary',
             'button--small',
-          ),
-        ),
-      );
+          ],
+        ],
+      ];
 
       $action_tag = Url::fromRoute('entity.powertagging.tag_content', ['powertagging_config' => $powertagging_config->id()], $link_options);
       $action_update_taxonomy = Url::fromRoute('entity.powertagging.update_vocabulary', ['powertagging_config' => $powertagging_config->id()], $link_options);
@@ -71,8 +72,10 @@ class PowerTaggingConfigForm extends EntityForm {
       $form['action_links'] = [
         '#markup' => '
       <ul class="action-links">
-          <li>' . Link::fromTextAndUrl(t('Tag content'), $action_tag)->toString() . '</li>
-          <li>' . Link::fromTextAndUrl(t('Update vocabulary'), $action_update_taxonomy)->toString() . '</li>
+          <li>' . Link::fromTextAndUrl(t('Tag content'), $action_tag)
+            ->toString() . '</li>
+          <li>' . Link::fromTextAndUrl(t('Update vocabulary'), $action_update_taxonomy)
+            ->toString() . '</li>
       </ul>',
       ];
     }
@@ -124,20 +127,23 @@ class PowerTaggingConfigForm extends EntityForm {
       ];
 
       // Language mapping.
-      $project_language_options = array();
+      $project_language_options = [];
       foreach ($project['languages'] as $project_language) {
         $project_language_options[$project_language] = $project_language;
       }
       $form['project_settings']['languages'] = [
         '#type' => 'fieldset',
-        '#title' => t('Map the Drupal languages with the PoolParty project languages')
+        '#title' => t('Map the Drupal languages with the PoolParty project languages'),
       ];
       $states = [];
       // Go through the defined languages.
       foreach (\Drupal::languageManager()->getLanguages() as $language) {
         $form['project_settings']['languages'][$language->getId()] = [
           '#type' => 'select',
-          '#title' => t('Drupal language: %language (@id)', ['%language' => $language->getName(), '@id' => $language->getId()]),
+          '#title' => t('Drupal language: %language (@id)', [
+            '%language' => $language->getName(),
+            '@id' => $language->getId(),
+          ]),
           '#description' => t('Select the PoolParty project language'),
           '#options' => $project_language_options,
           '#empty_option' => '',
@@ -146,7 +152,8 @@ class PowerTaggingConfigForm extends EntityForm {
         $states['#edit-project-settings-languages-' . $language->getId()] = ['value' => ''];
       }
       // Go through all locked languages ("Not specified" and "Not abblicable".
-      foreach (\Drupal::languageManager()->getDefaultLockedLanguages() as $language) {
+      foreach (\Drupal::languageManager()
+                 ->getDefaultLockedLanguages() as $language) {
         $form['project_settings']['languages'][$language->getId()] = [
           '#type' => 'select',
           '#title' => t('Drupal language: %language', ['%language' => $language->getName()]),
@@ -174,7 +181,7 @@ class PowerTaggingConfigForm extends EntityForm {
         //'#validated' => TRUE,
         '#element_validate' => [[$this, 'validateTaxonomy']],
         '#states' => [
-          'required' => ['#edit-project-settings-no-language-selected' => array('checked' => FALSE)],
+          'required' => ['#edit-project-settings-no-language-selected' => ['checked' => FALSE]],
           'disabled' => $states,
         ],
       ];
@@ -182,28 +189,28 @@ class PowerTaggingConfigForm extends EntityForm {
       // Ask if the vocabulary should be removed also if no language is
       // selected.
       if (!empty($config['project']['taxonomy_id'])) {
-        $form['project_settings']['remove_taxonomy'] = array(
+        $form['project_settings']['remove_taxonomy'] = [
           '#type' => 'checkbox',
           '#title' => t('Remove the appropriate vocabulary. All terms and relations to this vocabulary will be removed also.'),
-          '#states' => array(
+          '#states' => [
             'visible' => $states,
-          ),
-        );
+          ],
+        ];
       }
 
-      $form['project_settings']['mode'] = array(
+      $form['project_settings']['mode'] = [
         '#type' => 'radios',
         '#title' => t('PowerTagging mode'),
-        '#options' => array(
-          'annotation' => '<b>' . t('Annotation') . '</b> ' .  t('(use the whole thesaurus to tag the content)'),
-          'classification' => '<b>' . t('Classification') . '</b> ' .  t('(categorize the content on the top concept level)'),
-        ),
+        '#options' => [
+          'annotation' => '<b>' . t('Annotation') . '</b> ' . t('(use the whole thesaurus to tag the content)'),
+          'classification' => '<b>' . t('Classification') . '</b> ' . t('(categorize the content on the top concept level)'),
+        ],
         '#default_value' => (isset($config['project']['mode']) ? $config['project']['mode'] : 'annotation'),
         '#required' => TRUE,
-      );
+      ];
 
       // Get the corpus options for the currently configured PoolParty server.
-      $corpus_options = array();
+      $corpus_options = [];
       $corpora = $ppt_api->getCorpora($project['uuid']);
       foreach ($corpora as $corpus) {
         $corpus_options[$corpus['corpusId']] = $corpus['corpusName'];
@@ -213,27 +220,27 @@ class PowerTaggingConfigForm extends EntityForm {
       if (isset($config['project']['corpus_id']) && !empty($config['project']['corpus_id'])) {
         $corpus_id = $config['project']['corpus_id'];
       }
-      $form['project_settings']['corpus_id'] = array(
+      $form['project_settings']['corpus_id'] = [
         '#type' => 'select',
         '#title' => t('Select the corpus to use'),
         '#description' => t('Usage of a good corpus can improve your free terms considerably.'),
         '#options' => $corpus_options,
         '#default_value' => $corpus_id,
         "#empty_option" => !empty($corpus_options) ? '' : t('- No corpus available -'),
-        '#states' => array(
-          'visible' => array(':input[name="project_settings[mode]"]' => array('value' => 'annotation')),
-        ),
-      );
+        '#states' => [
+          'visible' => [':input[name="project_settings[mode]"]' => ['value' => 'annotation']],
+        ],
+      ];
 
       if (isset($overridden_values['corpus_id'])) {
         $form['project_settings']['corpus_id']['#description'] = '<span class="semantic-connector-overridden-value">' . t('Warning: overridden by variable') . '</span>';
       }
     }
     else {
-      $form['project_settings']['errors'] = array(
+      $form['project_settings']['errors'] = [
         '#type' => 'item',
         '#markup' => '<div class="messages warning">' . t('Either no connection can be established or there are no projects available for the given credentials.') . '</div>',
-      );
+      ];
     }
 
     // Tab: Global limit settings.
@@ -246,62 +253,62 @@ class PowerTaggingConfigForm extends EntityForm {
 
     // The most part of the global limits are only visible when PowerTagging is
     // used for annotation.
-    $form['global_limit_settings']['concepts']['concepts_threshold']['#states'] = array(
-      'visible' => array(':input[name="project_settings[mode]"]' => array('value' => 'annotation')),
-    );
-    $form['global_limit_settings']['freeterms']['#states'] = array(
-      'visible' => array(':input[name="project_settings[mode]"]' => array('value' => 'annotation')),
-    );
+    $form['global_limit_settings']['concepts']['concepts_threshold']['#states'] = [
+      'visible' => [':input[name="project_settings[mode]"]' => ['value' => 'annotation']],
+    ];
+    $form['global_limit_settings']['freeterms']['#states'] = [
+      'visible' => [':input[name="project_settings[mode]"]' => ['value' => 'annotation']],
+    ];
 
     $fields = $powertagging_config->getFields();
     if (!empty($fields)) {
-      $form['global_limit_settings']['overwriting'] = array(
+      $form['global_limit_settings']['overwriting'] = [
         '#type' => 'fieldset',
         '#title' => t('List of all content types with "PowerTagging Tags" fields'),
         '#description' => t('Select those content types which ones you want to overwrite the limits with the global limits defined above.'),
-      );
+      ];
       if (count($fields) > 1) {
-        $form['global_limit_settings']['overwriting']['select_all_content_types'] = array(
+        $form['global_limit_settings']['overwriting']['select_all_content_types'] = [
           '#type' => 'checkbox',
           '#title' => t('Select all'),
-          '#attributes' => array(
+          '#attributes' => [
             'onclick' => 'jQuery("#edit-overwrite-content-types").find("input").prop("checked", jQuery(this).prop("checked"));',
-          ),
-        );
+          ],
+        ];
       }
-      $form['global_limit_settings']['overwriting']['overwrite_content_types'] = array(
+      $form['global_limit_settings']['overwriting']['overwrite_content_types'] = [
         '#type' => 'checkboxes',
         '#options' => $powertagging_config->renderFields('option_list', $fields),
         '#validated' => TRUE,
-      );
+      ];
     }
 
     // Tab: Data fetching settings.
-    $properties = array(
+    $properties = [
       'skos:altLabel' => t('Alternative labels'),
       'skos:hiddenLabel' => t('Hidden labels'),
       'skos:scopeNote' => t('Scope notes'),
       'skos:related' => t('Related concepts'),
       'skos:exactMatch' => t('Exact matches'),
-    );
-    $form['data_properties_settings'] = array(
+    ];
+    $form['data_properties_settings'] = [
       '#type' => 'details',
       '#title' => t('Additional data'),
       '#group' => 'settings',
-    );
+    ];
 
-    $form['data_properties_settings']['data_properties'] = array(
+    $form['data_properties_settings']['data_properties'] = [
       '#type' => 'checkboxes',
       '#title' => t('Select the properties that will be saved in addition to the taxonomy terms during the PowerTagging process'),
       '#description' => t('If you clear a checkbox, all data of that property will be deleted from the associated vocabulary.'),
       '#options' => $properties,
       '#default_value' => $config['data_properties'],
-    );
+    ];
 
-    $form['concept_scheme_restriction'] = array(
+    $form['concept_scheme_restriction'] = [
       '#type' => 'value',
       '#value' => $config['concept_scheme_restriction'],
-    );
+    ];
 
     // Attach the libraries for the slider element.
     $form['#attached'] = [
@@ -320,7 +327,10 @@ class PowerTaggingConfigForm extends EntityForm {
     EntityAutocomplete::validateEntityAutocomplete($element, $form_state, $complete_form);
 
     // Create a new vocabulary if required.
-    if (!empty($taxonomy_name) && is_null($form_state->getValue(['project_settings', 'taxonomy_id']))) {
+    if (!empty($taxonomy_name) && is_null($form_state->getValue([
+        'project_settings',
+        'taxonomy_id',
+      ]))) {
       // Remove potential Element validation errors.
       $form_errors = $form_state->getErrors();
       $form_state->clearErrors();
@@ -339,12 +349,12 @@ class PowerTaggingConfigForm extends EntityForm {
 
       if (!$taxonomy) {
         // Create the new vocabulary.
-        $taxonomy = Vocabulary::create(array(
+        $taxonomy = Vocabulary::create([
           'vid' => $machine_name,
           'machine_name' => $machine_name,
           'description' => substr(t('Automatically created by PowerTagging configuration') . ' "' . $powertagging_config->getTitle() . '".', 0, 128),
           'name' => $taxonomy_name,
-        ));
+        ]);
         $taxonomy->save();
       }
       else {
@@ -385,13 +395,13 @@ class PowerTaggingConfigForm extends EntityForm {
     // Delete the data for deselected properties
     $clear_fields = array_diff($form['data_properties_settings']['data_properties']['#default_value'], $config['data_properties']);
     if (!empty($clear_fields)) {
-      $properties = array(
+      $properties = [
         'skos:altLabel' => 'field_alt_labels',
         'skos:hiddenLabel' => 'field_hidden_labels',
         'skos:scopeNote' => 'field_scope_notes',
         'skos:related' => 'field_related_concepts',
         'skos:exactMatch' => 'field_exact_match',
-      );
+      ];
       foreach ($clear_fields as $field) {
         $table = 'taxonomy_term__' . $properties[$field];
         \Drupal::database()->query('DELETE f
@@ -432,14 +442,10 @@ class PowerTaggingConfigForm extends EntityForm {
             'field_type' => $field_type,
           ];
           $limits = [
-            'concepts' => [
-              'concepts_per_extraction' => $config['limits']['concepts_per_extraction'],
-              'concepts_threshold' => $config['limits']['concepts_threshold'],
-            ],
-            'freeterms' => [
-              'freeterms_per_extraction' => $config['limits']['freeterms_per_extraction'],
-              'freeterms_threshold' => $config['limits']['freeterms_threshold'],
-            ],
+            'concepts_per_extraction' => $config['limits']['concepts_per_extraction']['slider'],
+            'concepts_threshold' => $config['limits']['concepts_threshold']['slider'],
+            'freeterms_per_extraction' => $config['limits']['freeterms_per_extraction']['slider'],
+            'freeterms_threshold' => $config['limits']['freeterms_threshold']['slider'],
           ];
           $powertagging_config->updateField($field, 'limits', $limits);
         }
@@ -448,15 +454,17 @@ class PowerTaggingConfigForm extends EntityForm {
 
     switch ($status) {
       case SAVED_NEW:
-        \Drupal::messenger()->addMessage($this->t('PowerTagging configuration %title has been created.', [
-          '%title' => $powertagging_config->getTitle(),
-        ]));
+        \Drupal::messenger()
+          ->addMessage($this->t('PowerTagging configuration %title has been created.', [
+            '%title' => $powertagging_config->getTitle(),
+          ]));
         break;
 
       default:
-        \Drupal::messenger()->addMessage($this->t('PowerTagging configuration %title has been updated.', [
-          '%title' => $powertagging_config->getTitle(),
-        ]));
+        \Drupal::messenger()
+          ->addMessage($this->t('PowerTagging configuration %title has been updated.', [
+            '%title' => $powertagging_config->getTitle(),
+          ]));
     }
     $form_state->setRedirectUrl(Url::fromRoute('entity.powertagging.collection'));
   }
@@ -486,7 +494,8 @@ class PowerTaggingConfigForm extends EntityForm {
     // Add information about the connection.
     $connection_markup = '';
     // Check the PoolParty server version if required.
-    if (\Drupal::config('semantic_connector.settings')->get('version_checking')) {
+    if (\Drupal::config('semantic_connector.settings')
+      ->get('version_checking')) {
       $api_version_info = $connection->getVersionInfo('PPX');
       if (version_compare($api_version_info['installed_version'], $api_version_info['latest_version'], '<')) {
         $connection_markup .= '<div class="messages warning"><div class="message">';
@@ -499,12 +508,13 @@ class PowerTaggingConfigForm extends EntityForm {
     }
     $concept_scheme_labels = [];
     if (isset($settings['concept_scheme_restriction']) && !empty($settings['concept_scheme_restriction'])) {
-      $concept_schemes = $powertagging_config->getConnection()->getApi('PPT')
+      $concept_schemes = $powertagging_config->getConnection()
+        ->getApi('PPT')
         ->getConceptSchemes($powertagging_config->getProjectId());
 
       if (is_array($concept_schemes)) {
         foreach ($concept_schemes as $concept_scheme) {
-          if (in_array($concept_scheme['uri'], $settings['concept_scheme_restriction'])) {
+          if ($concept_scheme['uri'] == $settings['concept_scheme_restriction']) {
             $concept_scheme_labels[] = $concept_scheme['title'];
           }
         }
@@ -516,7 +526,8 @@ class PowerTaggingConfigForm extends EntityForm {
     if (!empty($concept_scheme_labels)) {
       $connection_markup .= t('Selected concept schemes restrictions') . ': <b>' . implode('</b>, <b>', $concept_scheme_labels) . '</b><br />';
     }
-    $connection_markup .= Link::fromTextAndUrl(t('Change the connected PoolParty server or project'), Url::fromRoute('entity.powertagging.edit_form', ['powertagging' => $powertagging_config->id()]))->toString() . '</p>';
+    $connection_markup .= Link::fromTextAndUrl(t('Change the connected PoolParty server or project'), Url::fromRoute('entity.powertagging.edit_form', ['powertagging' => $powertagging_config->id()]))
+        ->toString() . '</p>';
 
     return $connection_markup;
   }
@@ -532,14 +543,14 @@ class PowerTaggingConfigForm extends EntityForm {
    *   The boolean value for the #tree attribute.
    */
   public static function addLimitsForm(array &$form, array $config, $tree = FALSE) {
-    $form['concepts'] = array(
+    $form['concepts'] = [
       '#type' => 'fieldset',
       '#title' => t('Concept / Category settings'),
       '#description' => t('Concepts are available in the thesaurus.'),
       '#tree' => $tree,
-    );
+    ];
 
-    $form['concepts']['concepts_per_extraction'] = array(
+    $form['concepts']['concepts_per_extraction'] = [
       '#title' => t('Max concepts / categories per extraction'),
       '#type' => 'slider',
       '#default_value' => $config['concepts_per_extraction'],
@@ -549,9 +560,9 @@ class PowerTaggingConfigForm extends EntityForm {
       '#slider_style' => 'concept',
       '#slider_length' => '500px',
       '#description' => t('Maximum number of concepts (or categories when the PowerTagging mode is set to "Classification") to be displayed as a tagging result.'),
-    );
+    ];
 
-    $form['concepts']['concepts_threshold'] = array(
+    $form['concepts']['concepts_threshold'] = [
       '#title' => t('Threshold level for the concepts'),
       '#type' => 'slider',
       '#default_value' => $config['concepts_threshold'],
@@ -561,18 +572,18 @@ class PowerTaggingConfigForm extends EntityForm {
       '#slider_style' => 'concept',
       '#slider_length' => '500px',
       '#description' => t('Only concepts with a minimum score of the chosen value will be displayed as a tagging result.'),
-    );
+    ];
 
-    $form['freeterms'] = array(
+    $form['freeterms'] = [
       '#type' => 'fieldset',
       '#title' => t('Free term settings'),
       '#collapsible' => FALSE,
       '#collapsed' => FALSE,
       '#description' => t('Free terms are extracted terms, which are not available in the thesaurus.'),
       '#tree' => $tree,
-    );
+    ];
 
-    $form['freeterms']['freeterms_per_extraction'] = array(
+    $form['freeterms']['freeterms_per_extraction'] = [
       '#title' => t('Max free terms per extraction'),
       '#type' => 'slider',
       '#default_value' => $config['freeterms_per_extraction'],
@@ -582,9 +593,9 @@ class PowerTaggingConfigForm extends EntityForm {
       '#slider_style' => 'freeterm',
       '#slider_length' => '500px',
       '#description' => t('Maximum number of free terms for tagging.'),
-    );
+    ];
 
-    $form['freeterms']['freeterms_threshold'] = array(
+    $form['freeterms']['freeterms_threshold'] = [
       '#title' => t('Threshold level for the free terms'),
       '#type' => 'slider',
       '#default_value' => $config['freeterms_threshold'],
@@ -594,7 +605,7 @@ class PowerTaggingConfigForm extends EntityForm {
       '#slider_length' => '500px',
       '#slider_style' => 'freeterm',
       '#description' => t('Only free terms with a minimum score of the chosen value will be used for tagging.') . '<br />' . t('WARNING: A threshold below 40 may reduce the quality of free term extractions!'),
-    );
+    ];
   }
 
   public static function addVocabularyFields(Vocabulary $vocabulary) {
@@ -657,10 +668,10 @@ class PowerTaggingConfigForm extends EntityForm {
         'required' => FALSE,
         'instance_settings' => [],
         'field_settings' => [],
-        'widget' => array(
+        'widget' => [
           'type' => 'string_textarea',
           'weight' => 6,
-        ),
+        ],
       ],
       'field_related_concepts' => [
         'field_name' => 'field_related_concepts',
@@ -674,10 +685,10 @@ class PowerTaggingConfigForm extends EntityForm {
           'title' => DRUPAL_DISABLED,
         ],
         'field_settings' => [],
-        'widget' => array(
+        'widget' => [
           'type' => 'link_default',
           'weight' => 7,
-        ),
+        ],
       ],
       'field_exact_match' => [
         'field_name' => 'field_exact_match',
@@ -702,7 +713,8 @@ class PowerTaggingConfigForm extends EntityForm {
       self::addFieldtoVocabulary($field, $vocabulary);
 
       // Set the widget data.
-      \Drupal::service('entity_display.repository')->getFormDisplay('taxonomy_term', $vocabulary->id())
+      \Drupal::service('entity_display.repository')
+        ->getFormDisplay('taxonomy_term', $vocabulary->id())
         ->setComponent($field['field_name'], $field['widget'])
         ->save();
     }
