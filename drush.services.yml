@@ -1,0 +1,9 @@
+services:
+  powertagging.commands:
+    class: \Drupal\powertagging\Commands\PowertaggingCommands
+    tags:
+      - { name: drush.command }
+    arguments:
+      - '@logger.factory'
+      - '@request_stack'
+      - '@entity_type.manager'
