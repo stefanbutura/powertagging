@@ -405,8 +405,7 @@ class PowerTaggingTagContentForm extends FormBase {
 
         // If there are any global notifications and they could be caused by a
         // missing retagging action, refresh the notifications.
-        $notifications = \Drupal::config('semantic_connector.settings')
-          ->get('global_notifications');
+        $notifications = SemanticConnector::getGlobalNotifications();
         if (!empty($notifications)) {
           $notification_config = SemanticConnector::getGlobalNotificationConfig();
           if (isset($notification_config['actions']['powertagging_retag_content']) && $notification_config['actions']['powertagging_retag_content']) {
