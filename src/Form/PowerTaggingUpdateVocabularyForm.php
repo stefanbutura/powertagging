@@ -126,6 +126,7 @@ class PowerTaggingUpdateVocabularyForm extends FormBase {
 
     // Get the term ID of all concepts with URI in the connected vocabulary.
     $tids = \Drupal::entityQuery('taxonomy_term')
+      ->accessCheck(TRUE)
       ->condition('vid', $config['project']['taxonomy_id'])
       ->condition('field_uri', '', '!=')
       ->execute();

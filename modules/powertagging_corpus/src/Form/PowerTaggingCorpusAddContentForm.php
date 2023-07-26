@@ -427,6 +427,7 @@ class PowerTaggingCorpusAddContentForm extends FormBase {
             $query->condition('created', $end_date, '<=');
           }
 
+          $query->accessCheck(TRUE);
           $entity_ids = $query->execute();
           foreach ($entity_ids as $entity_id) {
             $entities_info[] = array(

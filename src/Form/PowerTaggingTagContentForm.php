@@ -247,6 +247,7 @@ class PowerTaggingTagContentForm extends FormBase {
             $entity_query->condition('created', $date_filter['to'], '<=');
           }
 
+          $entity_query->accessCheck(TRUE);
           $entity_ids = $entity_query->execute();
           break;
 
@@ -260,6 +261,7 @@ class PowerTaggingTagContentForm extends FormBase {
             $entity_query->condition('created', $date_filter['to'], '<=');
           }
 
+          $entity_query->accessCheck(TRUE);
           $entity_ids = $entity_query->execute();
           // Remove the user with the ID = 0.
           if (reset($entity_ids) == 0) {
@@ -268,7 +270,9 @@ class PowerTaggingTagContentForm extends FormBase {
           break;
 
         case 'taxonomy_term':
-          $entity_ids = \Drupal::entityQuery($entity_type_id)->execute();
+          $entity_ids = \Drupal::entityQuery($entity_type_id)
+            ->accessCheck(TRUE)
+            ->execute();
           break;
       }
       $count = count($entity_ids);

@@ -128,6 +128,7 @@ class PowerTaggingSimilarConfig extends ConfigEntityBase implements PowerTagging
    */
   public static function exist($id) {
     $entity_count = \Drupal::entityQuery('powertagging_similar')
+      ->accessCheck(TRUE)
       ->condition('id', $id)
       ->count()
       ->execute();

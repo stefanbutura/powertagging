@@ -1,8 +1,9 @@
 name: PowerTagging
 type: module
 description: PowerTagging is semantic power for Drupal. This module extends Drupal’s ability to support linking and finding of ideas, contents and experts.
-core_version_requirement: ^8.7.7 || ^9
+core_version_requirement: ^8.7.7 || ^9 || ^10
 package: Semantic Drupal
 dependencies:
   - semantic_connector:semantic_connector (>=1.0)
   - drupal:taxonomy (>=8.8)
+  - jquery_ui_dialog:jquery_ui_dialog

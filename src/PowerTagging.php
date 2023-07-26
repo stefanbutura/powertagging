@@ -946,6 +946,7 @@ class PowerTagging {
 
       // Check if the term already exists.
       $old_term = \Drupal::entityQuery('taxonomy_term')
+        ->accessCheck(TRUE)
         ->condition('name', $label)
         ->condition('vid', $vid)
         ->condition('langcode', $langcode)
@@ -1254,7 +1255,7 @@ class PowerTagging {
     $content_type_options = [];
     if (!empty($field_instances)) {
       $node_type_names = node_type_get_names();
-      $taxonomy_names = taxonomy_vocabulary_get_names();
+      $taxonomy_names = \Drupal::entityQuery('taxonomy_vocabulary')->execute();
 
       /** @var FieldConfig $field_instance */
       foreach ($field_instances as $field_instance) {
@@ -1479,6 +1480,7 @@ class PowerTagging {
 
         // Search for the corresponding tids.
         $tids = \Drupal::entityQuery('taxonomy_term')
+          ->accessCheck(TRUE)
           ->condition('vid', $vid)
           ->condition('langcode', $langcode)
           ->condition('field_uri', $uris, 'IN')
@@ -1514,6 +1516,7 @@ class PowerTagging {
 
         // Search for the corresponding tids.
         $tids = \Drupal::entityQuery('taxonomy_term')
+          ->accessCheck(TRUE)
           ->condition('vid', $vid)
           ->condition('langcode', $langcode)
           ->condition('name', $labels, 'IN')

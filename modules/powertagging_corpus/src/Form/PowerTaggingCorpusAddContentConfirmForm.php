@@ -90,6 +90,7 @@ class PowerTaggingCorpusAddContentConfirmForm extends ConfirmFormBase {
           $query->condition('created', $end_date, '<=');
         }
 
+        $query->accessCheck(TRUE);
         $entity_count = $query->count()->execute();
         $content_list[] = $entity_count . ' ' . str_replace(' ', ' ', $entity_type) . 's' . ($entity_type != 'taxonomy_term' ? ' of type "' . $content_type . '"' : '');
       }

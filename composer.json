@@ -1,0 +1,22 @@
+{
+    "name": "drupal/powertagging",
+    "description": "PowerTagging is semantic power for Drupal. This module extends Drupal’s ability to support linking and finding of ideas, contents and experts.",
+    "type": "drupal-module",
+    "license": "GPL-2.0-or-later",
+    "homepage": "https://www.drupal.org/project/powertagging",
+    "support": {
+        "issues": "https://www.drupal.org/project/issues/powertagging",
+        "source": "https://git.drupalcode.org/project/powertagging"
+    },
+    "require": {
+        "drupal/semantic_connector": "^1.0",
+        "drupal/jquery_ui_dialog": "*"
+    },
+    "extra": {
+        "drush": {
+            "services": {
+                "drush.services.yml": "^9 || ^10"
+            }
+        }
+    }
+}

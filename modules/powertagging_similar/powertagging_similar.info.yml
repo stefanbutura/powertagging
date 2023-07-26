@@ -2,6 +2,6 @@ name: PowerTagging SeeAlso Engine
 type: module
 description: Show content similar to nodes tagged with PowerTagging in a widget.
 package: Semantic Drupal
-core_version_requirement: ^8.7.7 || ^9
+core_version_requirement: ^8.7.7 || ^9 || ^10
 dependencies:
  - powertagging:powertagging
